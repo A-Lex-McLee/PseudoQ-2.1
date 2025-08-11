@@ -21,7 +21,7 @@ from PsQ_GridCollection import GridCollection as GC
 
 # here you can insert your own model / dataset
 myModel = "solver1.keras"
-mySudokuData = "sudoku_dataset_1.npy"
+mySudokuData = "reduced_dataset_1.npy"
 
 
 
