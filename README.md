@@ -32,14 +32,14 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 - 
 Currently, the main purpose of the GUI is to illustrate the basic functionalities of Grid and GridCollection; further functionalities will be added.
 
-**Notebooks**: 
+**Notebooks**: DL projects with data produced by GridCollection
 - psq_binary_clf.ipynb
 - psq_multi_clf.ipynb
 - psq_solver_player.ipynb
 
 
 
-**Auxiliary classes**: 
+**Auxiliary classes/functions**: 
 
 
 
