@@ -28,13 +28,18 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 
 **GUI**: 
 - tkinter: 'PsQ_GUI' - obsolete/deprecated (in case you have not installed PyQt)
-- PyQt: 'PsQ_Display    
-Currently, the GUI is mostly for illustrating the basic functionalities of Grid and GridCollection
+- PyQt: 'PsQ_Display: Grid permutations, recodings, rnd grid generation; integrated Python editor (preliminary version)
+- 
+Currently, the main purpose of the GUI is to illustrate the basic functionalities of Grid and GridCollection; further functionalities will be added.
+
+**Notebooks**: 
+- psq_binary_clf.ipynb
+- psq_multi_clf.ipynb
+- psq_solver_player.ipynb
 
 
 
-* Grid
-* GridCollection
-* utilFunX
+**Auxiliary classes**: 
 
-* 
+
+
