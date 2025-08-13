@@ -8,7 +8,21 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 
 
 
-<pre> ```text This will be shown exactly as typed. Indentation is preserved. Special Markdown *characters* won't format. ``` </pre>
+<pre> ```
+GridCollection[ 
+                 internal shape: (1679616, 81)  
+                 active series: multiclass  	|	  size: 5443200  
+                 labeled series: 15 classes  
+                 labels: True   	|	  size: 5443200  
+                 abc series: False  
+                 garbage: True  	|	  size: 1979616 
+					 guest_grids              : 100000
+					 false_fromCurrent_seq    : 0
+					 false_fromCurrent_switch : 1679616
+					 false_cardinality        : 100000
+					 false_off_by_X           : 0
+					 false_arbitrary          : 100000 
+               ] ``` </pre>
 
 
 
