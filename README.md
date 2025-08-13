@@ -9,7 +9,17 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 
 **Central components**: 
 - Grid (class): instantiate, generate, manipulate and permute (individual) Sudoku grids; generate grid permutation series to be instantiated as GridCollection.
-- GridCollection (class):  
+- GridCollection (class):
+    * transform grid collections in various ways;
+    * activate collections with (or without) specific geometric properties (horizontal permutations, vertical permutations, diaflection/transposition);
+    * modify / encode the active series (one-hot, alphabetize, label-recoding); create multiclass collections; create puzzle collections (with k cells blanked = value replace by 0);
+    * activate garbage collection:
+        - create various kinds of (collections) of grids that violate Sudoku rules in specific ways (cardinality, local distortion, off-by-X etc.)
+        - create valid grids (= 'guest grids') that belong to geometric/permutation families different from the active series
+    * create train/test datasets (for ML/DL models) 
+        - binary classification
+        - multiclass classification
+        - blanked grids/puzzles to train solvers
 
 
 This repository is part of a side project of mine called "The syntax of Sudoko grids" (some might prefer the label 'geometry' instead of 'syntax', but I'm a linguist and I call the shots here!). It provides the basic architecture to instantiate, generate, manipulate and permute Sudoku grids.
