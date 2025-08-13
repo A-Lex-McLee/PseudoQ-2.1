@@ -11,18 +11,23 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 <pre> ```
 GridCollection[ 
                  internal shape: (1679616, 81)  
-                 active series: multiclass  	|	  size: 5443200  
-                 labeled series: 15 classes  
-                 labels: True   	|	  size: 5443200  
-                 abc series: False  
-                 garbage: True  	|	  size: 1979616 
-					 guest_grids              : 100000
-					 false_fromCurrent_seq    : 0
-					 false_fromCurrent_switch : 1679616
-					 false_cardinality        : 100000
-					 false_off_by_X           : 0
+                 active series: multiclass 
+	                size: 2903040  
+                 labeled series: 8 classes  
+                 labels: True  
+	               size: 2903040  
+                 garbage: True 
+	               total size: 562880 
+					 guest_grids              : 0
+					 false_fromCurrent_seq    : 362880
+					 false_fromCurrent_switch : 0
+					 false_cardinality        : 0
+					 false_off_by_X           : 100000
 					 false_arbitrary          : 100000 
-               ] ``` </pre>
+                 one_hot encoding: True  
+                 internal abc collection: False  
+               ] 
+``` </pre>
 
 
 
