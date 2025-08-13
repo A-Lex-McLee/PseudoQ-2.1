@@ -23,11 +23,13 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
         - blanked grids/puzzles to train solvers 
     * SQL API to load / store datasets 
 
-All other components require PsQ_Grid and PsQ_GridCollection
+(Almost) all other components require PsQ_Grid and PsQ_GridCollection.
 
 
-This repository is part of a side project of mine called "The syntax of Sudoko grids" (some might prefer the label 'geometry' instead of 'syntax', but I'm a linguist and I call the shots here!). It provides the basic architecture to instantiate, generate, manipulate and permute Sudoku grids.
-
+**GUI**: 
+- tkinter: 'PsQ_GUI' - obsolete/deprecated (in case you have not installed PyQt)
+- PyQt: 'PsQ_Display
+Currently, the GUI is mostly for illustrating the basic functionalities of Grid and GridCollection
 
 
 
