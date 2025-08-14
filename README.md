@@ -73,16 +73,18 @@ NB: All other components build on PsQ_Grid and PsQ_GridCollection.
 - 
 Currently, the main purpose of the GUI is to illustrate the basic functionalities of Grid and GridCollection; further functionalities will be added.
 
+
+**Auxiliary classes/functions**: prerequisites for notebooks
+- PsQ_BinClassification
+- PsQ_Solver_CNN 
+
+
 **Notebooks**: DL projects with data produced by GridCollection
 - psq_binary_clf.ipynb
 - psq_multi_clf.ipynb
 - psq_solver_player.ipynb
 
 
-
-**Auxiliary classes/functions**: 
-- PsQ_BinClassification
-- PsQ_
 
 
 
