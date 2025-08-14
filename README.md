@@ -51,9 +51,14 @@ print(gc)
                      internal abc collection: False  
                    ] 	
 . . . 
-X_train, X_test, y_train, y_test = gc.split_multiclass(train_ratio=0.7, seed=42) 
-X_train.shape, X_test.shape, y_train.shape, y_test.shape 
->>> ((2286143, 9, 9, 9), (979777, 9, 9, 9), (2286143,), (979777,))	
+data = gc.split_multiclass(train_ratio=0.7, seed=42) 
+# data = (X_train, X_test, y_train, y_test)  
+for dataset in data:
+    print(dataset.shape)
+>>> (2286143, 9, 9, 9)
+>>> (979777, 9, 9, 9)
+>>> (2286143,)
+>>>> (979777,)	
 
 ``` </pre>
 
