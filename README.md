@@ -23,15 +23,15 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
     * SQL API to load / store datasets 
 
 
-<pre> ```
+<pre> ```# illustration: create a dataset for multiclass classification task  
 gc = GridCollection.from_scratch()
 gc.makeFalseGrids_arbitrary() 
 gc.makeFalseGrids_cardinality()
 gc.makeFalseGrids_offBy_X(how_many=345678, X=2, how_far=4)
 gc.activate_multiClassSeries(classes=8)  # since make_garbage=True (default) -> + 1 garbage class = 9 classes
 gc.activate_oneHotSeries()	
-print(gc)
-	
+. . . 
+print(gc)	
 >>> GridCollection[ 
                      internal shape: (1679616, 81)  
                      active series: multiclass 
