@@ -24,6 +24,9 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 
 
 <pre> ```
+gc = GridCollection.from_scratch()
+gc.activate_multiclassSeries(classes=8)
+gc.makeFalseGrids_from
 GridCollection[ 
                  internal shape: (1679616, 81)  
                  active series: multiclass 
