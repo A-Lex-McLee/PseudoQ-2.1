@@ -81,6 +81,12 @@ Currently, the main purpose of the GUI is to illustrate the basic functionalitie
 
 
 **Auxiliary classes/functions**: 
+- PsQ_BinClassification
+- PsQ_
+
+
+
+
 
 
 
