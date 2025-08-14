@@ -62,19 +62,10 @@ for dataset in data:
 >>>> (979777,)	
 
 ``` </pre>
+<br>
 
-
-
-
-
-
-
-
-
-
-
-(Almost) all other components require PsQ_Grid and PsQ_GridCollection.
-
+NB: All other components build on PsQ_Grid and PsQ_GridCollection.
+<br>
 
 **GUI**: 
 - tkinter: 'PsQ_GUI' - obsolete/deprecated (in case you have not installed PyQt)
