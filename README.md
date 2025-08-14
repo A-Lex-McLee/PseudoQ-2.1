@@ -25,26 +25,31 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 
 <pre> ```
 gc = GridCollection.from_scratch()
-gc.activate_multiclassSeries(classes=8)
-gc.makeFalseGrids_from
+gc.makeFalseGrids_arbitrary() 
+gc.makeFalseGrids_cardinality()
+gc.makeFalseGrids_offBy_X(how_many=345678, X=2, how_far=4)
+gc.activate_multiClassSeries(classes=8)
+gc.activate_oneHotSeries()	
+print(gc)
+	
 GridCollection[ 
                  internal shape: (1679616, 81)  
                  active series: multiclass 
-	                size: 2903040  
-                 labeled series: 8 classes  
+	                size: 3265920  
+                 labeled series: 9 classes  
                  labels: True  
-	               size: 2903040  
+	               size: 3265920  
                  garbage: True 
-	               total size: 562880 
+	               total size: 545678 
 					 guest_grids              : 0
-					 false_fromCurrent_seq    : 362880
+					 false_fromCurrent_seq    : 0
 					 false_fromCurrent_switch : 0
-					 false_cardinality        : 0
-					 false_off_by_X           : 100000
+					 false_cardinality        : 100000
+					 false_off_by_X           : 345678
 					 false_arbitrary          : 100000 
                  one_hot encoding: True  
                  internal abc collection: False  
-               ] 
+               ] 	
 ``` </pre>
 
 
