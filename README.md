@@ -23,7 +23,8 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
     * SQL API to load / store datasets 
 
 
-<pre> ```# illustration: create a dataset for multiclass classification task  
+<pre> ```
+# illustration: create a dataset for multiclass classification task  
 gc = GridCollection.from_scratch()
 gc.makeFalseGrids_arbitrary() 
 gc.makeFalseGrids_cardinality()
