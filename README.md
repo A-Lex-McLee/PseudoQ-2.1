@@ -32,24 +32,29 @@ gc.activate_multiClassSeries(classes=8)
 gc.activate_oneHotSeries()	
 print(gc)
 	
-GridCollection[ 
-                 internal shape: (1679616, 81)  
-                 active series: multiclass 
-	                size: 3265920  
-                 labeled series: 9 classes  
-                 labels: True  
-	               size: 3265920  
-                 garbage: True 
-	               total size: 545678 
-					 guest_grids              : 0
-					 false_fromCurrent_seq    : 0
-					 false_fromCurrent_switch : 0
-					 false_cardinality        : 100000
-					 false_off_by_X           : 345678
-					 false_arbitrary          : 100000 
-                 one_hot encoding: True  
-                 internal abc collection: False  
-               ] 	
+>>> GridCollection[ 
+                     internal shape: (1679616, 81)  
+                     active series: multiclass 
+   	                	size: 3265920  
+                     labeled series: 9 classes  
+                     labels: True  
+	               		size: 3265920  
+                     garbage: True 
+	               		total size: 545678 
+ 					 		guest_grids              : 0
+					 		false_fromCurrent_seq    : 0
+					 		false_fromCurrent_switch : 0
+					 		false_cardinality        : 100000
+					 		false_off_by_X           : 345678
+					 		false_arbitrary          : 100000 
+                     one_hot encoding: True  
+                     internal abc collection: False  
+                   ] 	
+. . . 
+X_train, X_test, y_train, y_test = gc.split_multiclass(train_ratio=0.7, seed=42) 
+X_train.shape, X_test.shape, y_train.shape, y_test.shape 
+>>> ((2286143, 9, 9, 9), (979777, 9, 9, 9), (2286143,), (979777,))	
+
 ``` </pre>
 
 
