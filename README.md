@@ -68,8 +68,8 @@ NB: All other components build on PsQ_Grid and PsQ_GridCollection.
 <br>
 
 **GUI**: 
-- tkinter: 'PsQ_GUI' - obsolete/deprecated (in case you have not installed PyQt)
-- PyQt: 'PsQ_Display: Grid permutations, recodings, rnd grid generation; integrated Python editor (preliminary version)
+- tkinter: 'PsQ_GUI' - obsolete/deprecated (just in case you have not installed PyQt)
+- PyQt: 'PsQ_Display: Grid permutations, recodings, rnd grid generation; AI Sudoku solver; integrated Python editor (preliminary version)
 - 
 Currently, the main purpose of the GUI is to illustrate the basic functionalities of Grid and GridCollection; further functionalities will be added.
 
