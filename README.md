@@ -20,8 +20,9 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
         - binary classification
         - multiclass classification
         - blanked grids/puzzles to train solvers 
-    * SQL API to load / store datasets 
+    * SQL API to load / store datasets <br>
 
+$\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
 
 <pre> ```
 # illustration: create a dataset for multiclass classification task  
