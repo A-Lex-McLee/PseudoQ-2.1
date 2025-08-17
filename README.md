@@ -89,8 +89,8 @@ Currently, the main purpose of the GUI is to illustrate the basic functionalitie
 
 <br> 
 
-⚠️ Note: This project uses third-party libraries (NumPy, pandas, matplotlib, PyQt5, TensorFlow, scipy).
-These are not included in the repository and must be installed separately.
+⚠️ Note: This project uses third-party libraries (NumPy, pandas, matplotlib, PyQt5, TensorFlow / keras, scipy). <br>
+These are not included in the repository and must be installed separately. <br>
 They are subject to their own licenses.
 
 
