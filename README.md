@@ -6,7 +6,7 @@ This does not merely concern the solving of actual Sudoku puzzles, but also the 
 
 **PseudoQ** is the result of the (still ongoing) project *The Syntax of Sudoku* intended to address the above issues (and more). Version 2.1 now available in this repository provides the basic infrastructure and architecture for the manipulation of individual grids, processing large collections of grids, and creating datasets for various ML/DL tasks, among others.  
 
-Notably, $\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
+$\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
 
 
 **Central components**: 
