@@ -1,0 +1,18 @@
+# Core libraries
+numpy==1.26.4
+pandas==2.3.1
+scipy==1.13.1
+scikit-learn==1.6.1
+
+# GUI
+PyQt5==5.15.11
+
+# Machine learning / deep learning
+# For macOS (Apple Silicon) users:
+tensorflow-macos==2.16.2
+# For non-macOS users, replace the above with:
+# tensorflow==2.16.2
+keras==3.10.0
+
+# Utilities
+tqdm==4.67.1
