@@ -88,9 +88,9 @@ Currently, the main purpose of the GUI is to illustrate the basic functionalitie
 - psq_solver_player.ipynb
 
 
-**Also included**: 
-- solver1.keras
-- data
+**Also included**: (for application, see psq_solver_player; GUI)
+- solver1.keras           (pretrained Sudoku solver)
+- reduced_dataset_1.npy   (dataset for solver1)
 
 
 <br> 
