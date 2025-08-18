@@ -87,6 +87,12 @@ Currently, the main purpose of the GUI is to illustrate the basic functionalitie
 - psq_multi_clf.ipynb
 - psq_solver_player.ipynb
 
+
+**Also included**: 
+- solver1.keras
+- data
+
+
 <br> 
 
 ⚠️ Note: This project uses third-party libraries (NumPy, pandas, matplotlib, PyQt5, TensorFlow / keras, sklearn, tqdm). <br>
