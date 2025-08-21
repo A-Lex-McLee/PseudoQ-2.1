@@ -561,7 +561,7 @@ class Grid:
         return tuple(out)
 
 
-    def grid_toArray(self, shape=(81,)) -> np.ndarray:
+    def grid_toArray(self, shape=None) -> np.ndarray:
         """ 
         returns the  current grid as a numpy array; 
 
@@ -572,6 +572,8 @@ class Grid:
             i.e. the product of (int_1, int_2 ... int_n) must equal self.SIZE.
 
         """
+        if shape is None:
+            shape=(self.SIZE,)
         return self._arrayGrid.copy().reshape(shape)
 
 
