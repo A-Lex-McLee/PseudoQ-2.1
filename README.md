@@ -28,7 +28,8 @@ $\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
 
 <pre> ```
 # illustration: create a dataset for multiclass classification task  
-gc = GridCollection.from_scratch()
+import GridCollection as GC
+gc = GC.from_scratch()
 gc.makeFalseGrids_arbitrary() 
 gc.makeFalseGrids_cardinality()
 gc.makeFalseGrids_offBy_X(how_many=345678, X=2, how_far=4)
