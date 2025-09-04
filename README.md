@@ -82,8 +82,9 @@ Currently, the main purpose of the GUI is to illustrate the basic functionalitie
 - PsQ_Solver_CNN 
 
 
-**Stand-alone file**: modular knight travels acrosse Sudoku grid 
+**Stand-alone file**: modular knight travels across the Sudoku grid 
 - PsQ_ModuloKnight
+
 
 **Notebooks**: DL projects with data produced by GridCollection
 - psq_binary_clf.ipynb
