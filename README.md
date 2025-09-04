@@ -68,8 +68,6 @@ for dataset in data:
 
 ``` </pre>
 <br>
-
-NB: All other components build on PsQ_Grid and PsQ_GridCollection.
 <br>
 
 **GUI**: 
@@ -83,6 +81,9 @@ Currently, the main purpose of the GUI is to illustrate the basic functionalitie
 - PsQ_BinClassification
 - PsQ_Solver_CNN 
 
+
+**Stand-alone file**: modular knight travels acrosse Sudoku grid 
+- PsQ_ModuloKnight
 
 **Notebooks**: DL projects with data produced by GridCollection
 - psq_binary_clf.ipynb
