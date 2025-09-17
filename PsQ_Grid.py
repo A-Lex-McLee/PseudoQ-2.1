@@ -28,7 +28,7 @@ import pandas as pd
 import warnings
 
 
-from utilFunX import _str_toSeq, _type_checker, _infer_basenumber, _is_validgrid
+from utilFunX import _str_toSeq, _type_checker, _infer_basenumber, _is_validgrid, _all_grid_coords
 from PsQ_GridCollection import GridCollection
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
@@ -571,9 +571,9 @@ class Grid:
             must be reshapeable in accordance with self.SIZE;
             i.e. the product of (int_1, int_2 ... int_n) must equal self.SIZE.
 
-        """
+        """ 
         if shape is None:
-            shape=(self.SIZE,)
+            shape = (self.__SIZE,)
         return self._arrayGrid.copy().reshape(shape)
 
 
@@ -741,7 +741,52 @@ class Grid:
 
 
        
+
+
     
+    
+    def is_chivalrous(self, mod: bool = False) -> bool: 
+        """
+        Checks whether this grid follows the anti-Knight's-move-constraint
+
+        Parameters
+        ----------
+        mod : bool, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        bool
+            DESCRIPTION.
+
+        """
+        KNIGHT_MOVES = [
+            (+2, +1), (+2, -1), (-2, +1), (-2, -1),
+            (+1, +2), (+1, -2), (-1, +2), (-1, -2),
+        ]
+        grid = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION)) 
+    
+        for r, c in _all_grid_coords(size=self.DIMENSION):
+            for dr, dc in KNIGHT_MOVES:
+                nr, nc = r + dr, c + dc
+                if mod:
+                    nr %= self.DIMENSION
+                    nc %= self.DIMENSION
+                elif not (0 <= nr < self.DIMENSION and 0 <= nc < self.DIMENSION):
+                    continue
+    
+                if grid[r, c] == grid[nr, nc]:
+                    return False
+        return True
+
+
+    
+
+
+ 
+
+
+
 
     """ E.    SYMMETRY / GEOMETRY"""
 
@@ -806,7 +851,8 @@ class Grid:
         """
         Scans the current grid box-wise (i.e. window size = BASE_NUMBER × BASE_NUMBER) 
         and compares the sum of the current box to the expected 'kleiner Gauss' sum.  
-        You can choose whether to allow edge-overflow.
+        You can choose whether to allow edge-overflow. 
+        #dummy_convolutional_layer
         
         Parameters
         ----------
@@ -837,7 +883,175 @@ class Grid:
                                                "box_window" : _box, 
                                                "flat_window" : _box.flatten() }
             scannedGrid.append(out)
-        return pd.DataFrame(scannedGrid)
+        return pd.DataFrame(scannedGrid) 
+        
+        # result = {d["running_number"]: {k: v for k, v in d.items() if k != "running_number"} 
+        #           for d in scannedGrid}
+        # return result
+
+
+
+    """ E''     Phistomefel Ring"""
+    
+    def _box_coords(self, boxrow, boxcolumn):
+        """Return (r0, r1_excl, c0, c1_excl) for box (boxrow,boxcolumn)."""
+        boxrow -= 1
+        boxcolumn -= 1
+        k = self.BASE_NUMBER
+        r0 = (boxrow % k) * k
+        c0 = (boxcolumn % k) * k
+        return r0, r0 + k, c0, c0 + k
+    
+    def _relative_corner_mask(self, boxrow, boxcolumn):
+        """
+        Boolean mask selecting the four (BASE_NUMBER-1) x (BASE_NUMBER-1) corner-squares
+        *outside* the outer (BASE_NUMBER+2)×(BASE_NUMBER+2) square around box (boxrow,boxcolumn),
+        with modular wrap-around.
+        """
+        boxrow -= 1
+        boxcolumn -= 1
+        k = self.BASE_NUMBER
+        n = self.DIMENSION
+        offset = k - 1
+        if offset <= 0:
+            return np.zeros((n, n), dtype=bool)
+    
+        # top-left index of the box (in absolute cell coords)
+        r0 = (boxrow % k) * k
+        c0 = (boxcolumn % k) * k
+    
+        # outer square indices (length L = k+2)
+        L = k + 2
+        rows_outer = (r0 - 1 + np.arange(L)) % n
+        cols_outer = (c0 - 1 + np.arange(L)) % n
+    
+        # compute the 'top' and 'bottom' row-index blocks (length = offset)
+        top_start = (rows_outer[0] - offset) % n
+        top_rows  = (top_start + np.arange(offset)) % n
+    
+        bottom_start = (rows_outer[-1] + 1) % n
+        bottom_rows  = (bottom_start + np.arange(offset)) % n
+    
+        # compute the 'left' and 'right' column-index blocks (length = offset)
+        left_start = (cols_outer[0] - offset) % n
+        left_cols  = (left_start + np.arange(offset)) % n
+    
+        right_start = (cols_outer[-1] + 1) % n
+        right_cols  = (right_start + np.arange(offset)) % n
+    
+        mask = np.zeros((n, n), dtype=bool)
+        # set the four corner blocks (each offset x offset)
+        mask[np.ix_(top_rows, left_cols)]   = True  # top-left
+        mask[np.ix_(top_rows, right_cols)]  = True  # top-right
+        mask[np.ix_(bottom_rows, left_cols)]= True  # bottom-left
+        mask[np.ix_(bottom_rows, right_cols)]= True # bottom-right
+    
+        return mask
+    
+    
+    def _relative_outer_ring_mask(self, boxrow, boxcolumn):
+        """Boolean mask for the 1-cell-thick ring *around* box (boxrow,boxcolumn), modular wrap-around.
+           The ring is the border of the (k+2)×(k+2) square centered on the box.
+        """
+        boxrow -= 1
+        boxcolumn -= 1
+        k = self.BASE_NUMBER
+        n = self.DIMENSION
+        r0 = (boxrow % k) * k
+        c0 = (boxcolumn % k) * k
+    
+        L = k + 2  # number of rows/cols in outer square
+        rows_outer = (r0 - 1 + np.arange(L)) % n   # length L
+        cols_outer = (c0 - 1 + np.arange(L)) % n   # length L
+    
+        top = rows_outer[0]
+        bottom = rows_outer[-1]
+        left = cols_outer[0]
+        right = cols_outer[-1]
+    
+        mask = np.zeros((n, n), dtype=bool)
+        mask[top, cols_outer] = True           # top edge
+        mask[bottom, cols_outer] = True        # bottom edge
+        mask[rows_outer, left] = True          # left edge
+        mask[rows_outer, right] = True         # right edge
+    
+        return mask
+    
+    # public getters (return the grid values masked)
+    def get_relativeCornerBoxes(self, boxrow, boxcolumn) -> np.ndarray:
+        """
+        Returns 4 BASENUMBER-1 x BASENUMBER-1 boxes, which sit in the four corners
+        in the classical Phistomefel constellation (i.e. with ring around the 
+                                                    center box). 
+        (boxrow, boxcolumn) denotes the box around which the ring is drawn, and
+        relative to which the "corner" boxes are established. 
+
+        Parameters
+        ----------
+        boxrow : int 
+            box row coordinate (1-3).
+        boxcolumn : int
+            box column coordinate (1-3).
+
+        Returns
+        -------
+        np.ndarray
+            four corner boxes.
+        """
+        mask = self._relative_corner_mask(boxrow, boxcolumn)
+        return self.grid_toArray((self.DIMENSION, self.DIMENSION)) * mask
+    
+    def get_relativePhistomefelRing(self, boxrow, boxcolumn): 
+        """
+        Returns the Phistomefel ring or the pendant resulting from (modular) shift
+        that is drawn around the box (boxrow, boxcolumn).
+
+        Parameters
+        ----------
+        boxrow : int 
+            box row coordinate (1-3).
+        boxcolumn : int
+            box column coordinate (1-3).
+
+        Returns
+        -------
+        np.ndarray
+            The "ring" around the box specified by (boxrow, boxcolumn).
+        """
+        mask = self._relative_outer_ring_mask(boxrow, boxcolumn)
+        return self.grid_toArray((self.DIMENSION, self.DIMENSION)) * mask
+    
+    def get_relativePhistomefelField(self, boxrow, boxcolumn):
+        """
+        Returns Phistomefel ring + four cornerboxes. 
+
+        Parameters
+        ----------
+        boxrow : int 
+            box row coordinate (1-3).
+        boxcolumn : int
+            box column coordinate (1-3).
+
+        Returns
+        -------
+        np.ndarray
+            Phistomefel ring + four cornerboxes.
+        """
+        mask = self._relative_corner_mask(boxrow, boxcolumn) | self._relative_outer_ring_mask(boxrow, boxcolumn)
+        return self.grid_toArray((self.DIMENSION, self.DIMENSION)) * mask
+
+
+
+
+    
+
+
+
+
+
+
+
+
 
 
 
@@ -1426,6 +1640,381 @@ grd5 =  (3, 1, 7, 2, 4, 6, 5, 9, 8,
 
 
 
+
+
+
+
+
+
+# some grids satifying the anti-knight's move constraint
+
+proto_knight_grids = [
+    
+    (6, 7, 2, 1, 5, 3, 4, 8, 9,
+     9, 8, 1, 4, 7, 2, 3, 5, 6,
+     5, 3, 4, 6, 8, 9, 1, 7, 2,
+     2, 5, 6, 8, 3, 1, 9, 4, 7,
+     7, 1, 9, 2, 4, 5, 8, 6, 3,
+     8, 4, 3, 9, 6, 7, 2, 1, 5,
+     4, 2, 5, 3, 1, 6, 7, 9, 8,
+     1, 9, 7, 5, 2, 8, 6, 3, 4,
+     3, 6, 8, 7, 9, 4, 5, 2, 1),
+    
+    (6, 7, 8, 5, 9, 4, 3, 1, 2,
+     4, 2, 5, 3, 1, 6, 8, 7, 9,
+     1, 9, 3, 7, 2, 8, 6, 4, 5,
+     8, 3, 6, 2, 7, 9, 4, 5, 1,
+     7, 4, 2, 6, 5, 1, 9, 8, 3,
+     5, 1, 9, 8, 4, 3, 7, 2, 6,
+     3, 5, 1, 9, 8, 7, 2, 6, 4,
+     9, 8, 4, 1, 6, 2, 5, 3, 7,
+     2, 6, 7, 4, 3, 5, 1, 9, 8), 
+    
+    (1, 8, 9, 3, 5, 6, 2, 7, 4,
+     6, 2, 3, 7, 8, 4, 9, 5, 1, 
+     5, 4, 7, 1, 2, 9, 3, 8, 6, 
+     9, 7, 1, 5, 6, 3, 8, 4, 2,
+     3, 6, 2, 8, 4, 1, 5, 9, 7,
+     4, 5, 8, 9, 7, 2, 1, 6, 3, 
+     2, 1, 5, 6, 9, 7, 4, 3, 8, 
+     8, 3, 6, 4, 1, 5, 7, 2, 9, 
+     7, 9, 4, 2, 3, 8, 6, 1, 5),
+    
+    (6, 1, 2, 3, 8, 9, 4, 5, 7,
+     7, 8, 3, 5, 1, 4, 6, 2, 9,
+     9, 4, 5, 7, 2, 6, 8, 1, 3,
+     1, 6, 7, 2, 3, 5, 9, 8, 4,
+     5, 3, 8, 9, 4, 1, 2, 7, 6,
+     4, 2, 9, 6, 7, 8, 1, 3, 5,
+     2, 9, 6, 1, 5, 7, 3, 4, 8,
+     8, 5, 1, 4, 9, 3, 7, 6, 2,
+     3, 7, 4, 8, 6, 2, 5, 9, 1), 
+    
+    (6,8,9,5,7,2,4,1,3,
+     3,7,1,4,6,9,5,8,2,
+     2,5,4,8,3,1,7,6,9,
+     8,2,6,9,5,7,1,3,4,
+     9,1,3,6,2,4,8,5,7,
+     5,4,7,3,1,8,9,2,6,
+     4,6,2,7,8,5,3,9,1,
+     1,9,5,2,4,3,6,7,8,
+     7,3,8,1,9,6,2,4,5),
+
+    (2,3,5,1,6,4,7,8,9,
+     4,6,9,8,2,7,3,1,5,
+     7,1,8,9,5,3,6,2,4,
+     1,5,3,4,9,6,8,7,2,
+     6,9,4,2,7,8,1,5,3,
+     8,7,2,5,3,1,9,4,6,
+     5,2,7,3,1,9,4,6,8,
+     9,4,6,7,8,2,5,3,1,
+     3,8,1,6,4,5,2,9,7),
+    
+    (1,8,5,4,2,9,7,3,6,
+     7,2,6,3,8,1,9,5,4,
+     4,9,3,7,5,6,1,2,8,
+     6,1,9,2,4,5,3,8,7,
+     2,7,8,6,1,3,5,4,9,
+     3,5,4,8,9,7,2,6,1,
+     8,3,2,9,7,4,6,1,5,
+     9,6,1,5,3,8,4,7,2,
+     5,4,7,1,6,2,8,9,3), 
+    
+    (4,9,6,1,7,5,3,2,8,
+     8,5,2,4,9,3,6,7,1,
+     3,1,7,2,8,6,4,9,5,
+     9,6,1,8,5,7,2,4,3,
+     5,2,8,3,4,9,1,6,7,
+     7,4,3,6,2,1,8,5,9,
+     6,3,9,7,1,2,5,8,4,
+     2,8,5,9,3,4,7,1,6,
+     1,7,4,5,6,8,9,3,2),
+    
+    (9,1,7,4,3,2,5,6,8,
+     8,6,2,7,9,5,1,3,4,
+     5,4,3,8,6,1,7,9,2,
+     7,3,9,5,1,4,8,2,6,
+     1,2,6,9,7,8,4,5,3,
+     4,5,8,3,2,6,9,7,1,
+     3,8,5,2,4,9,6,1,7,
+     2,9,1,6,8,7,3,4,5,
+     6,7,4,1,5,3,2,8,9),
+    
+    (4,6,5,9,3,2,1,7,8,
+     1,3,9,8,7,6,2,5,4,
+     2,7,8,1,5,4,6,9,3,
+     9,5,4,6,1,8,7,3,2,
+     8,1,3,7,2,9,5,4,6,
+     6,2,7,3,4,5,9,8,1,
+     3,9,2,4,6,7,8,1,5,
+     5,8,1,2,9,3,4,6,7,
+     7,4,6,5,8,1,3,2,9), 
+    
+    (2,5,9,8,7,6,1,3,4,
+     7,6,4,3,5,1,2,9,8,
+     8,1,3,4,9,2,7,5,6,
+     5,9,1,6,2,7,8,4,3,
+     4,7,6,5,3,8,9,1,2,
+     3,2,8,9,1,4,6,7,5,
+     9,8,2,1,4,5,3,6,7,
+     1,4,7,2,6,3,5,8,9,
+     6,3,5,7,8,9,4,2,1), 
+    
+    (5,8,9,2,1,3,7,6,4,
+     7,1,4,5,6,9,8,2,3,
+     2,6,3,4,7,8,5,1,9,
+     9,3,8,1,2,7,4,5,6,
+     1,7,5,6,3,4,9,8,2,
+     4,2,6,9,8,5,1,3,7,
+     3,4,1,8,9,2,6,7,5,
+     8,5,7,3,4,6,2,9,1,
+     6,9,2,7,5,1,3,4,8), 
+    
+    (9,8,6,7,2,5,1,3,4,
+     2,3,1,4,9,8,5,7,6,
+     7,5,4,1,6,3,2,9,8,
+     5,4,8,2,7,6,3,1,9,
+     3,1,2,8,4,9,6,5,7,
+     6,9,7,3,5,1,8,4,2,
+     8,6,9,5,3,7,4,2,1,
+     1,2,5,9,8,4,7,6,3,
+     4,7,3,6,1,2,9,8,5),
+    
+    (4,5,3,7,8,9,2,1,6,
+     6,8,7,2,1,5,9,3,4,
+     2,1,9,4,3,6,8,7,5,
+     5,3,4,9,7,2,6,8,1,
+     9,7,8,6,5,1,3,4,2,
+     1,2,6,8,4,3,7,5,9,
+     3,4,2,1,9,7,5,6,8,
+     7,9,1,5,6,8,4,2,3,
+     8,6,5,3,2,4,1,9,7),
+
+    (8,1,3,2,9,4,7,6,5,
+     6,4,7,3,5,1,8,2,9,
+     2,5,9,7,6,8,1,3,4,
+     3,2,1,9,7,6,5,4,8,
+     7,6,8,5,4,3,2,9,1,
+     4,9,5,8,1,2,3,7,6,
+     1,3,2,6,8,9,4,5,7,
+     5,8,6,4,3,7,9,1,2,
+     9,7,4,1,2,5,6,8,3), 
+    
+    (3,2,1,6,4,7,5,8,9,
+     7,4,5,1,8,9,6,3,2,
+     8,6,9,5,3,2,1,7,4,
+     6,1,2,4,7,3,8,9,5,
+     9,7,4,8,6,5,3,2,1,
+     5,3,8,9,2,1,4,6,7,
+     2,5,3,7,1,8,9,4,6,
+     4,9,7,3,5,6,2,1,8,
+     1,8,6,2,9,4,7,5,3),
+    
+    (9,1,4,8,7,3,6,2,5,
+     5,7,6,4,2,9,8,1,3,
+     8,2,3,6,1,5,9,4,7,
+     6,3,5,9,8,1,2,7,4,
+     7,4,9,5,3,2,1,8,6,
+     2,8,1,7,4,6,5,3,9,
+     3,5,8,1,6,4,7,9,2,
+     1,9,2,3,5,7,4,6,8,
+     4,6,7,2,9,8,3,5,1),
+    
+    (4,1,8,5,2,9,7,6,3,
+     3,7,5,6,1,4,8,2,9,
+     6,9,2,3,7,8,4,5,1,
+     5,4,1,2,3,6,9,7,8,
+     7,8,6,9,4,5,1,3,2,
+     2,3,9,7,8,1,5,4,6,
+     1,5,7,8,6,3,2,9,4,
+     9,6,4,1,5,2,3,8,7,
+     8,2,3,4,9,7,6,1,5),
+    
+    (3,8,6,2,4,5,7,1,9,
+     5,1,7,6,8,9,3,2,4,
+     4,2,9,7,1,3,6,8,5,
+     7,4,3,5,2,6,8,9,1,
+     8,6,1,3,9,4,5,7,2,
+     9,5,2,8,7,1,4,6,3,
+     1,9,8,4,5,7,2,3,6,
+     6,7,4,1,3,2,9,5,8,
+     2,3,5,9,6,8,1,4,7), 
+    
+    (5,1,6,2,9,8,7,3,4,
+     9,4,7,3,1,6,8,2,5,
+     8,2,3,7,5,4,6,1,9,
+     7,6,2,8,4,5,3,9,1,
+     4,5,1,9,6,3,2,7,8,
+     3,8,9,1,7,2,4,5,6,
+     1,9,8,4,2,7,5,6,3,
+     6,7,4,5,3,9,1,8,2,
+     2,3,5,6,8,1,9,4,7),
+    
+    (5,7,9,3,1,4,8,2,6,
+     8,6,4,9,2,5,3,7,1,
+     3,2,1,7,8,6,5,9,4,
+     4,3,2,8,7,1,6,5,9,
+     9,5,6,4,3,2,1,8,7,
+     1,8,7,6,5,9,4,3,2,
+     2,1,8,5,6,7,9,4,3,
+     6,9,5,2,4,3,7,1,8,
+     7,4,3,1,9,8,2,6,5),
+    
+    (6,1,5,4,9,8,3,7,2,
+     2,8,3,6,7,5,1,9,4,
+     4,7,9,3,2,1,5,6,8,
+     7,6,1,2,8,9,4,5,3,
+     8,3,2,5,6,4,7,1,9,
+     5,9,4,7,1,3,2,8,6,
+     9,5,6,1,3,2,8,4,7,
+     1,2,8,9,4,7,6,3,5,
+     3,4,7,8,5,6,9,2,1),
+    
+    (6,1,7,9,8,5,2,3,4,
+     8,4,3,2,6,1,5,9,7,
+     5,9,2,3,4,7,8,6,1,
+     9,5,1,8,7,4,3,2,6,
+     4,3,8,1,2,6,9,7,5,
+     2,7,6,5,3,9,1,4,8,
+     7,2,9,6,5,8,4,1,3,
+     3,8,4,7,1,2,6,5,9,
+     1,6,5,4,9,3,7,8,2),
+    
+    (3,2,8,7,4,9,1,5,6,
+     5,4,6,8,3,1,2,7,9,
+     1,7,9,6,5,2,4,3,8,
+     7,9,3,5,2,4,6,8,1,
+     6,8,4,1,7,3,9,2,5,
+     2,5,1,9,6,8,3,4,7,
+     9,3,7,2,8,6,5,1,4,
+     8,6,2,4,1,5,7,9,3,
+     4,1,5,3,9,7,8,6,2),
+    
+    (4,5,1,9,3,2,7,6,8,
+     3,8,2,4,6,7,1,5,9,
+     9,6,7,5,8,1,4,3,2,
+     6,7,3,8,5,4,9,2,1,
+     1,2,4,3,7,9,6,8,5,
+     8,9,5,1,2,6,3,7,4,
+     7,3,9,2,1,8,5,4,6,
+     2,1,6,7,4,5,8,9,3,
+     5,4,8,6,9,3,2,1,7),
+    
+    (7,3,9,1,2,8,4,6,5,
+     8,5,1,7,6,4,3,9,2,
+     4,6,2,3,9,5,1,7,8,
+     9,2,3,8,5,1,6,4,7,
+     5,7,8,6,4,3,9,2,1,
+     1,4,6,2,7,9,5,8,3,
+     2,9,4,5,1,7,8,3,6,
+     6,8,5,4,3,2,7,1,9,
+     3,1,7,9,8,6,2,5,4),
+    
+    (6,1,8,2,4,7,5,3,9,
+     5,7,9,8,3,6,1,2,4,
+     2,3,4,1,5,9,6,7,8,
+     9,2,1,6,7,5,4,8,3,
+     7,5,6,3,8,4,2,9,1,
+     8,4,3,9,1,2,7,5,6,
+     4,8,2,7,9,1,3,6,5,
+     1,9,7,5,6,3,8,4,2,
+     3,6,5,4,2,8,9,1,7), 
+    
+    (2,1,8,6,9,3,7,4,5,
+     9,4,5,8,1,7,3,2,6,
+     3,6,7,2,4,5,8,9,1,
+     8,3,6,7,2,4,5,1,9,
+     4,2,1,5,8,9,6,3,7,
+     5,7,9,1,3,6,2,8,4,
+     7,9,4,3,6,2,1,5,8,
+     6,8,3,4,5,1,9,7,2,
+     1,5,2,9,7,8,4,6,3),
+    
+    (6,4,3,7,2,5,8,1,9,
+     7,9,5,3,1,8,4,2,6,
+     1,2,8,6,9,4,3,5,7,
+     3,1,6,9,7,2,5,8,4,
+     5,7,9,4,8,1,2,6,3,
+     2,8,4,5,6,3,9,7,1,
+     8,6,1,2,3,9,7,4,5,
+     9,5,2,1,4,7,6,3,8,
+     4,3,7,8,5,6,1,9,2),
+    
+    (6,5,2,4,3,9,8,1,7,
+     7,9,4,1,6,8,5,2,3,
+     3,8,1,5,2,7,4,9,6,
+     4,3,6,9,7,2,1,8,5,
+     1,7,9,6,8,5,2,3,4,
+     8,2,5,3,1,4,7,6,9,
+     2,4,3,7,9,1,6,5,8,
+     9,1,7,8,5,6,3,4,2,
+     5,6,8,2,4,3,9,7,1),
+    
+    (1,5,8,2,4,7,6,9,3,
+     3,4,9,6,1,5,7,8,2,
+     6,2,7,9,8,3,4,1,5,
+     2,1,5,8,3,4,9,6,7,
+     7,9,4,5,6,1,2,3,8,
+     8,6,3,7,9,2,5,4,1,
+     5,3,6,1,2,9,8,7,4,
+     9,7,1,4,5,8,3,2,6,
+     4,8,2,3,7,6,1,5,9),
+    
+    (4,7,5,1,6,3,2,8,9,
+     8,9,2,4,7,5,1,6,3,
+     1,6,3,2,8,9,4,7,5,
+     5,4,6,3,1,8,9,2,7,
+     7,2,9,5,4,6,3,1,8,
+     3,1,8,9,2,7,5,4,6,
+     6,3,1,8,9,2,7,5,4,
+     2,5,7,6,3,4,8,9,1,
+     9,8,4,7,5,1,6,3,2),
+    
+    (1,8,7,9,6,2,3,4,5,
+     3,6,9,5,4,8,7,1,2,
+     2,4,5,3,1,7,6,9,8,
+     8,5,4,1,7,6,2,3,9,
+     9,3,2,4,8,5,1,7,6,
+     7,1,6,2,3,9,5,8,4,
+     4,7,8,6,2,3,9,5,1,
+     6,9,3,8,5,1,4,2,7,
+     5,2,1,7,9,4,8,6,3),
+    
+    (8,5,9,7,2,4,1,3,6,
+     1,3,6,8,5,9,7,2,4,
+     4,7,2,1,3,6,8,5,9,
+     7,4,1,2,6,8,5,9,3,
+     3,6,8,5,9,1,4,7,2,
+     2,9,5,4,7,3,6,8,1,
+     9,2,4,6,8,7,3,1,5,
+     6,8,3,9,1,5,2,4,7,
+     5,1,7,3,4,2,9,6,8),
+    
+    (1,7,6,8,5,3,9,4,2,
+     9,5,2,4,1,7,3,6,8,
+     3,8,4,9,6,2,5,1,7,
+     6,1,8,7,3,5,2,9,4,
+     5,9,7,2,4,1,6,8,3,
+     2,4,3,6,8,9,1,7,5,
+     4,2,1,3,9,8,7,5,6,
+     7,6,5,1,2,4,8,3,9,
+     8,3,9,5,7,6,4,2,1),
+    
+    (2,9,6,7,8,3,4,1,5,
+     5,3,4,2,1,6,7,9,8,
+     1,7,8,4,9,5,2,3,6,
+     7,6,5,8,4,9,3,2,1,
+     4,2,3,5,6,1,9,8,7,
+     9,8,1,3,2,7,5,6,4,
+     8,5,7,1,3,2,6,4,9,
+     6,4,2,9,5,8,1,7,3,
+     3,1,9,6,7,4,8,5,2)
+    
+    ]
+
+
+
+
     
 intro = ("\n\n\t\t====================================================\n"
          "\t\t*                                                  * \n"
@@ -1465,6 +2054,22 @@ if __name__ == '__main__':
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ##########################################
 
 
@@ -1473,6 +2078,23 @@ if __name__ == '__main__':
 
 # faculty(81) / (faculty(9)**9) = 
     # 53130688706387570345024083447116905297676780137518287775972350551392256        (len 71)
+
+
+
+# g = Grid()
+# abc_k = []
+
+# for gr in proto_knight_grids:
+#     g.insert(gr)
+#     for i in range(2):
+#         g.diaflect()
+#         for j in range(4):
+#             g.rotate()
+#             print(f"valid: {g.is_valid()}  ==  knight: {g.is_chivalrous()}")
+#             abc_k.append(g.canonical_abc_key())
+#     print()
+
+
 
 
 
