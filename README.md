@@ -62,7 +62,7 @@ print(gc)
                    ] 	
 . . . 
 data = gc.split_multiclass(train_ratio=0.7, seed=42) 
-# data = (X_train, X_test, y_train, y_test)  
+# data == (X_train, X_test, y_train, y_test)  
 for dataset in data:
     print(dataset.shape)
 >>> (2286143, 9, 9, 9)
