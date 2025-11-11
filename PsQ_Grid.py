@@ -12,15 +12,20 @@ Created in Spring 2020; revised winter 2022/23, spring 2025
 
 """
 
+
+
 from __future__ import annotations
 import numpy as np
-from itertools import permutations, product  # combinations, 
-from typing import Optional, TypeVar, List, Tuple,  Dict, Sequence, Union, Iterator # Collection, Set, 
+from itertools import permutations, product, combinations 
+from typing import Optional, TypeVar, List, Tuple, Set, Dict, Sequence, Union, Iterator, Iterable # Collection 
+import random
 from random import shuffle, seed as rnd_seed   #choice, sample
 from math import factorial # sqrt
 from copy import deepcopy
 from dataclasses import dataclass
-from collections.abc import Callable
+from typing import Callable
+
+
 from tqdm import tqdm
 import pandas as pd
 # import sqlite3
@@ -176,6 +181,7 @@ class Grid:
              for inn in range(self.BASE_NUMBER) 
             )
         self._arrayGrid = np.zeros(shape=(self.DIMENSION, self.DIMENSION), dtype=np.int8)
+        self.Generator = GridGenerator()
         
 
     def __str__(self) -> str:
@@ -185,9 +191,14 @@ class Grid:
             f"  base number     : {self.BASE_NUMBER}  \n"
             f"   -> dimension   : {self.DIMENSION}\t\t ( = {self.BASE_NUMBER} x {self.BASE_NUMBER} ) \n"
             f"   -> size        : {self.SIZE}\t\t ( = {self.DIMENSION} X {self.DIMENSION} ) \n"
+            f"  unique triplets : {len(self.get_uniqueTriplets())}\n\n"
             f"  is initialized  : {self.is_initialized()}\n"
-            f"  is alphabetized : {self.is_alphabetized()}\n"
             f"  is valid        : {self.is_validGrid(self._arrayGrid)}\n"
+            f"  is alphabetized : {self.is_alphabetized()}\n\n"
+            f"  dia_dist: main  : {self.is_diagonallyDistinct()[0]}\n"
+            f"  dia_dist: anti  : {self.is_diagonallyDistinct()[1]}\n"
+            f"  anti-knight     : {self.is_chivalrous()}\n"
+            f"  modulo-knight   : {self.is_chivalrous(True)}\n"
             f"]"
         )
 
@@ -339,8 +350,7 @@ class Grid:
         """
         Empties the grid by setting all values to zero
         """
-#        self.insert(np.zeros(shape=(self.SIZE,)))
-        self._quick_insert(np.zeros(shape=(self.SIZE,)))
+        self._quick_insert(np.zeros(shape=(self.SIZE,), dtype=int))
         
 
 
@@ -585,10 +595,51 @@ class Grid:
     """
     
     
-    def generate_rndGrid(self, 
-                         seed: int = None, 
-                         max_attempts: int = 10,
-                         history: bool = False) -> Optional[Tuple[Tuple[int]]]:
+    
+    def setGenerator(self,
+                        anti_knight = False,
+                        modular_knight = False,
+                        diagonal_choice = None,
+                        history: bool = False
+
+                        ) -> None:
+        """
+        Specify the GridGenerator to impose constraint(s) on random grid generation.
+
+        Parameters
+        ----------
+        anti_knight : bool, optional
+            The 'Anti knight's move constraint' is activated: 
+                two cells separated by a chess knight's move cannot have the same value.
+        modular_knight : bool, optional
+            Modification of the 'Anti knight's move constraint': 
+                knight's move applies across boundaries in a modular wrap-around fashion.
+        diagonal_choice : str, optional
+            Diagonal is treated as a Sudoku dimension: all nine digits must be distinct.
+            Options (else None):
+                'main' -- main diagonal (top-left <--> bottom-right)
+                'anti' -- anti diagonal (bottom-left <--> top-right)
+                'both' -- both diagonals (= X-constraint)
+                
+        Notes:
+        ------
+        The more constraints are activated the more difficult to generate a grid
+        that satisfies all conditions. There are solutions to all combinations, 
+        but in conjunction with some specific RANDOM SEED, it may take longer or
+        no solution may be found (-> remove or choose a different seed).
+
+        """
+        antiknight = ([anti_knight_constraint(wrap_around=modular_knight)] 
+                      if anti_knight else None)
+
+        self.Generator = GridGenerator( 
+            base_number = self.BASE_NUMBER,
+            constraints = antiknight, 
+            diagonal_choice = diagonal_choice,
+            history=history
+            )
+
+    def generate_rndGrid(self, seed = None, max_attempts=10) -> None: 
         """
         Generate a random valid Sudoku grid and insert it into this object.
         
@@ -602,19 +653,40 @@ class Grid:
         history : bool
             If True, method returns the history of grid generation (positions).
     
+        TODO
         Returns
         -------
-        None
-        """
-        grid, _history = generate_validGrid(base_number=self.BASE_NUMBER, 
-                                            seed = seed, 
-                                            max_attempts = max_attempts,
-                                            history=history)
-        assert self.is_validGrid(grid)
-        self.insert(grid)
-        if history:
-            return _history
-            
+        List[Tuple[int, int]] if class parameter 'history' is set to True else None; 
+            list of 
+         
+        """        
+        grid, _ = self.Generator.generate(seed=seed, max_attempts = max_attempts)
+        self.insert(grid) 
+        
+    
+    
+    
+    def complete(self, grid: np.ndarray, insert: bool = False) -> Optional[np.ndarray]:
+        try:
+            int_grid = np.array(grid, 
+                                dtype=int
+                                ).reshape(self.BASE_NUMBER, self.BASE_NUMBER) 
+        except ValueError:
+            msg = (f"Required shape: {(self.BASE_NUMBER, self.BASE_NUMBER)}; type: int;"
+                   f"Got {grid.shape}; {grid.dtype}")
+            raise ValueError(msg)
+        
+        full_grid = self.Generator.complete(int_grid) 
+        if insert:
+            self.insert(full_grid)
+        else:
+            return full_grid
+        
+
+    
+    
+    
+    
 
 
 
@@ -705,10 +777,6 @@ class Grid:
         return True, None
 
         
-    
-
-
-
 
 
 
@@ -751,8 +819,8 @@ class Grid:
 
         Parameters
         ----------
-        mod : bool, optional
-            DESCRIPTION. The default is False.
+        mod : bool, optional; the default is False.
+            If True, checks modular wrap-around knight's moves as well.        
 
         Returns
         -------
@@ -780,7 +848,11 @@ class Grid:
         return True
 
 
-    
+    def is_diagonallyDistinct(self):
+        grd = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION))
+        main = (len(set(grd.diagonal())) == self.DIMENSION)
+        anti = (len(set(np.flipud(grd).diagonal())) == self.DIMENSION)
+        return main, anti
 
 
  
@@ -789,6 +861,34 @@ class Grid:
 
 
     """ E.    SYMMETRY / GEOMETRY"""
+    
+    def getDiagonal(self, ax="m"):
+        """
+        Returns a diagonal of the grid. 
+
+        Parameters
+        ----------
+        ax : str, optional
+            Determines the diagonal to be returned. 
+            "m" -> main diagonal (top-left to bottom-right);
+            "a" -> anti-diagonal (bottom-left to top-right).
+            The default is "m".
+
+        Returns
+        -------
+        np.array
+            The specified diagonal.
+
+        """
+        grd = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION))
+        if ax == "m":
+            return grd.diagonal()
+        elif ax == "a":
+            return np.flipud(grd).diagonal()
+        else:
+            raise ValueError("Invalid axis specification; choose 'm' or 'a'.")
+        
+        
 
     def rotate(self, k=-1) -> None:
         """ 
@@ -834,7 +934,7 @@ class Grid:
     
     def _getIndices(self) -> np.ndarray:
         """
-        aux-method @
+        aux-method @scanGrid
 
         Returns
         -------
@@ -847,6 +947,7 @@ class Grid:
         return running[half:self.DIMENSION-half, half:self.DIMENSION-half].flatten()
         
     
+    # todo: fix return type! 
     def scanGrid(self, overflow: bool = False) -> pd.DataFrame:
         """
         Scans the current grid box-wise (i.e. window size = BASE_NUMBER × BASE_NUMBER) 
@@ -862,7 +963,7 @@ class Grid:
         
         Returns
         -------
-        pd.DataFrame
+        pd.DataFrame    # alternatively: dictionary
             DataFrame containing columns:
             - 'running_number': position in grid (1-81)
             - 'sum': the sum of values in the box
@@ -883,15 +984,15 @@ class Grid:
                                                "box_window" : _box, 
                                                "flat_window" : _box.flatten() }
             scannedGrid.append(out)
-        return pd.DataFrame(scannedGrid) 
-        
-        # result = {d["running_number"]: {k: v for k, v in d.items() if k != "running_number"} 
-        #           for d in scannedGrid}
-        # return result
+            
+    #    return pd.DataFrame(scannedGrid) 
+        result = {d["running_number"]: {k: v for k, v in d.items() if k != "running_number"} 
+                  for d in scannedGrid}
+        return result
 
 
 
-    """ E''     Phistomefel Ring"""
+    """ E''     Phistomefel Ring  -- with modular wrap-around """
     
     def _box_coords(self, boxrow, boxcolumn):
         """Return (r0, r1_excl, c0, c1_excl) for box (boxrow,boxcolumn)."""
@@ -980,7 +1081,7 @@ class Grid:
     # public getters (return the grid values masked)
     def get_relativeCornerBoxes(self, boxrow, boxcolumn) -> np.ndarray:
         """
-        Returns 4 BASENUMBER-1 x BASENUMBER-1 boxes, which sit in the four corners
+        Returns 4 BASE_NUMBER-1 x BASE_NUMBER-1 boxes, which sit in the four corners
         in the classical Phistomefel constellation (i.e. with ring around the 
                                                     center box). 
         (boxrow, boxcolumn) denotes the box around which the ring is drawn, and
@@ -1042,25 +1143,51 @@ class Grid:
 
 
 
-
-    
-
+    """ E'''  TRIPLET Grids """
 
 
 
+    def get_tripletDigits(self) -> Dict[int, Set[str]]:
+        grid = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION))
+        return get_digits_inTriplets(grid)
 
 
+    def make_tripletGraph(self) -> Dict[str, Dict]:
+        grid = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION))
+        return make_tripletGraph_dict(grid)
+
+    def make_tripletGrid(self) -> np.ndarray:
+        grid = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION))
+        return make_tripGrid(grid, shape=(-1, self.BASE_NUMBER))
 
 
+    def get_triplets(self) -> Tuple[Tuple[int]]:
+        grid = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION))
+        return get_triplets(grid, basenumber=self.BASE_NUMBER)
+
+    def get_uniqueTriplets(self) -> Tuple[Tuple[int]]:
+        grid = self.grid_toArray(shape=(self.DIMENSION, self.DIMENSION))
+        return get_uniqueTriplets(grid, basenumber=self.BASE_NUMBER)
 
 
+    def generate_minTripletGrid(self, A, B, C, seed=None, insert=True): 
+        grid = generate_amazing_grid(A, B, C, seed=seed)
+        if insert:
+            self.insert(grid)
+        else:
+            return grid 
+        
 
-
+    def get_minTripletCollection(self, to_gc: bool = False, abc: bool = False):
+        grids = amazingTriplet_grids(abc=abc)
+        out_grids = np.array(grids)
+        if to_gc:
+            return GridCollection(out_grids.reshape(-1, 81)) 
+        else:
+            return out_grids
 
 
     """ F.    PERMUTE (parts of) the GRID """
-    
-    
 
     def _permuteGridAxis(self, grid: np.ndarray, axis: int) -> List[np.ndarray]:
         """
@@ -1264,7 +1391,7 @@ class Grid:
     
         This general-purpose recoding replaces grid values based on a user-supplied 
         sequence. The top row defines the mapping domain, and the `recoder` provides 
-        the image. The substitution is applied element-wise across the entire grid.
+        the image. The substitution is applied element-wise across the entire grid.  
     
         Parameters
         ----------
@@ -1417,14 +1544,6 @@ class Grid:
 
 
 
-
-
-
-
-
-
-
-
 # ****************************   special for gui   ************************************** #
 # *****************************    keep for now   *************************************** #
 
@@ -1501,85 +1620,630 @@ class Grid:
             out.append(tuple(tempGrid))
         return tuple(out)
 
-# ******************************************************************************
-
+# *************************************************************************************************
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
-class GridGenerator:
-    def __init__(self, base_number: int = 3, history: bool = False) -> None:
-        self.BASE_NUMBER: int = base_number
-        self.DIMENSION: int = base_number**2
-        self.grid: np.ndarray = np.zeros((self.DIMENSION, self.DIMENSION), dtype=int)
-        self._history: bool = history
-        self._history_list: List[Tuple[int]] = [] if history else None # Type
+# -------------------------
+# Constraint type alias
+# -------------------------
+# signature: (grid, num, row, col, base_number, DIM, mod_flag) -> bool
+ConstraintFn = Callable[[np.ndarray, int, int, int, int, int, bool], bool]
 
-    def generate(self) -> Tuple[np.ndarray, Optional[List[Tuple[int]]]]:
-        self.grid[:] = 0
-        if self._fill_grid(0, 0):
-            return self.grid.copy(), self._history_list
-        else:
-            raise RuntimeError("Unable to generate a valid grid")
 
-    def _fill_grid(self, row: int, col: int) -> bool:
-        if row == self.DIMENSION:
-            return True  # Entire grid is filled
+# -------------------------
+# Built-in constraints
+# -------------------------
+def anti_knight_constraint(wrap_around: bool = False) -> ConstraintFn:
+    """
+    Anti-knight constraint factory.
+    If wrap_around True, the board is treated toroidally (modular indices).
+    """
+    KNIGHT_OFFSETS = [
+        (2, 1), (2, -1), (-2, 1), (-2, -1),
+        (1, 2), (1, -2), (-1, 2), (-1, -2),
+    ]
 
-        next_row, next_col = (row, col + 1) if col < self.DIMENSION - 1 else (row + 1, 0)
-
-        digits = list(range(1, self.DIMENSION + 1))
-        shuffle(digits)  # Randomize attempts for more grid diversity
-
-        for num in digits:
-            if self._is_valid(num, row, col):
-                self.grid[row, col] = num
-                if self._history:
-                    self._history_list.append((row, col))
-
-                if self._fill_grid(next_row, next_col):
-                    return True
-                self.grid[row, col] = 0  # Backtrack
-
-        return False  # No valid number could be placed
-
-    def _is_valid(self, num: int, row: int, col: int) -> bool:
-        # Row & column check
-        if num in self.grid[row, :]:
-            return False
-        if num in self.grid[:, col]:
-            return False
-
-        # Box check
-        box_row = (row // self.BASE_NUMBER) * self.BASE_NUMBER
-        box_col = (col // self.BASE_NUMBER) * self.BASE_NUMBER
-        if num in self.grid[box_row:box_row + self.BASE_NUMBER, box_col:box_col + self.BASE_NUMBER]:
-            return False
-
+    def constraint_fn(grid, value, row_idx, col_idx, base_number, DIM, mod_flag):
+        # closure param `wrap_around` controls wrap; mod_flag is ignored here.
+        for row_offset, col_offset in KNIGHT_OFFSETS:
+            rr = row_idx + row_offset
+            cc = col_idx + col_offset
+            if wrap_around:
+                rr %= DIM
+                cc %= DIM
+            else:
+                if rr < 0 or rr >= DIM or cc < 0 or cc >= DIM:
+                    continue
+            if grid[rr, cc] == value:
+                return False
         return True
 
+    return constraint_fn
 
+
+# (Optional) small diagonal constraint factory kept for completeness;
+# actual diagonal logic below uses internal diag sets for speed.
+def diagonal_distinct_constraint(which: str = "both") -> ConstraintFn:
+    assert which in ("main", "anti", "both")
+
+    def constraint_fn(grid, value, r, c, base_number, DIM, mod_flag):
+        # This simple check is conservative and intended only for use
+        # in external contexts; GridGenerator uses efficient sets instead.
+        if which in ("main", "both") and r == c:
+            for i in range(DIM):
+                if i == r:
+                    continue
+                if grid[i, i] == value:
+                    return False
+        if which in ("anti", "both") and r + c == DIM - 1:
+            for i in range(DIM):
+                rr, cc = i, DIM - 1 - i
+                if rr == r and cc == c:
+                    continue
+                if grid[rr, cc] == value:
+                    return False
+        return True
+
+    return constraint_fn
+
+
+# -------------------------
+# GridGenerator
+# -------------------------
+class GridGenerator:
+    def __init__(
+        self,
+        base_number: int = 3,
+        constraints: Optional[List[ConstraintFn]] = None,
+        mod_for_constraints: bool = False,
+        use_mrv: bool = True,
+        diagonal_choice: Optional[str] = None,  # 'main'|'anti'|'both'|None
+        history: bool = False,
+    ) -> None:
+        """
+        base_number: sqrt of grid dimension (3 -> 9x9).
+        constraints: list of extra constraint callables.
+        mod_for_constraints: whether constraint callables should assume wrap-around.
+        use_mrv: choose next cell by Minimum Remaining Values if True.
+        diagonal_choice: enforce distinctness on 'main'|'anti'|'both' diagonals if set.
+        history: store placements as (r,c,value) if True.
+        """
+        self.BASE_NUMBER: int = int(base_number)
+        self.DIM: int = self.BASE_NUMBER ** 2
+        self.grid: np.ndarray = np.zeros((self.DIM, self.DIM), dtype=int)
+
+        self.constraints: List[ConstraintFn] = constraints[:] if constraints else []
+        self.mod_constraints: bool = bool(mod_for_constraints)
+        self.use_mrv: bool = bool(use_mrv)
+
+        self.diagonal_choice = diagonal_choice  # 'main'|'anti'|'both' or None
+
+        self._history: bool = bool(history)
+        self._history_list: List[Tuple[int, int, int]] = [] if history else []
+
+        # incremental sets for fast legality checks
+        self.row_used: List[Set[int]] = [set() for _ in range(self.DIM)]
+        self.col_used: List[Set[int]] = [set() for _ in range(self.DIM)]
+        self.box_used: List[Set[int]] = [set() for _ in range(self.DIM)]
+
+        # diag sets for diagonal distinctness enforcement
+        self.main_diag_used: Set[int] = set()
+        self.anti_diag_used: Set[int] = set()
+
+    # -------------------------
+    # Public API
+    # -------------------------
+    def generate(
+        self,
+        seed: Optional[int] = None,
+        max_attempts: int = 10,
+    ) -> Tuple[np.ndarray, Optional[List[Tuple[int, int, int]]]]:
+        """
+        Generate a full grid satisfying constraints.
+        Returns (filled_grid_copy, history_or_None).
+        """
+        for attempt in range(max_attempts):
+            if seed is not None:
+                random.seed(seed + attempt)
+            self._reset_state()
+            try:
+                self._random_fill()
+                history_copy = self._history_list.copy() if self._history else None
+                return self.grid.copy(), history_copy
+            except RuntimeError:
+                # try again with different randomness
+                continue
+        raise RuntimeError(f"Failed to generate a valid grid after {max_attempts} attempts")
+
+    def complete(self, partial_grid: np.ndarray, seed: Optional[int] = None) -> np.ndarray:
+        """
+        Try to complete a partially-filled grid (zeros = blanks).
+        Returns a filled grid or raises RuntimeError if impossible.
+        """
+        if seed is not None:
+            random.seed(seed)
+        self._reset_state()
+        self.grid[:, :] = 0
+        self._initialize_from_partial(partial_grid)
+        if self._fill_backtrack():
+            return self.grid.copy()
+        raise RuntimeError("Provided partial grid is not completable with the given constraints")
+
+    # -------------------------
+    # Internal helpers
+    # -------------------------
+    def _reset_state(self):
+        self.grid[:, :] = 0
+        self._history_list = [] if self._history else []
+        self.row_used = [set() for _ in range(self.DIM)]
+        self.col_used = [set() for _ in range(self.DIM)]
+        self.box_used = [set() for _ in range(self.DIM)]
+        self.main_diag_used = set()
+        self.anti_diag_used = set()
+
+    def _initialize_from_partial(self, partial: np.ndarray):
+        """Validate partial grid and populate incremental sets."""
+        if partial.shape != (self.DIM, self.DIM):
+            raise ValueError("partial grid must have shape (DIM, DIM)")
+
+        for row_idx in range(self.DIM):
+            for col_idx in range(self.DIM):
+                value = int(partial[row_idx, col_idx])
+                if value == 0:
+                    continue
+                if not (1 <= value <= self.DIM):
+                    raise ValueError(f"Value {value} out of range at {(row_idx, col_idx)}")
+                # basic conflicts
+                if (value in self.row_used[row_idx]
+                        or value in self.col_used[col_idx]
+                        or value in self.box_used[self._box_index(row_idx, col_idx)]):
+                    raise RuntimeError("Partial grid contains basic Sudoku conflicts")
+                # set placement
+                self.grid[row_idx, col_idx] = value
+                self.row_used[row_idx].add(value)
+                self.col_used[col_idx].add(value)
+                self.box_used[self._box_index(row_idx, col_idx)].add(value)
+                if row_idx == col_idx:
+                    self.main_diag_used.add(value)
+                if row_idx + col_idx == self.DIM - 1:
+                    self.anti_diag_used.add(value)
+                # additional constraints must also accept the initial placement
+                for constraint_fn in self.constraints:
+                    if not constraint_fn(self.grid, value, row_idx, col_idx,
+                                         self.BASE_NUMBER, self.DIM, self.mod_constraints):
+                        raise RuntimeError("Partial grid violates additional constraint(s)")
+
+    def _random_fill(self):
+        """Start a backtracking fill on empty board."""
+        if not self._fill_backtrack():
+            raise RuntimeError("Backtracking failed to generate a full grid")
+
+    def _fill_backtrack(self) -> bool:
+        """Recursive backtracking with MRV and randomized candidate order."""
+        next_cell = self._select_next_cell()
+        if next_cell is None:
+            return True  # filled
+        row_idx, col_idx = next_cell
+
+        candidate_values = list(self._candidates_for_cell(row_idx, col_idx))
+        random.shuffle(candidate_values)
+
+        for value in candidate_values:
+            self._place_number(value, row_idx, col_idx)
+            if self._fill_backtrack():
+                return True
+            self._remove_number(value, row_idx, col_idx)
+
+        return False
+
+    def _select_next_cell(self) -> Optional[Tuple[int, int]]:
+        """Return next empty cell; MRV if enabled, else first empty in scan order."""
+        if not self.use_mrv:
+            for row_idx in range(self.DIM):
+                for col_idx in range(self.DIM):
+                    if self.grid[row_idx, col_idx] == 0:
+                        return (row_idx, col_idx)
+            return None
+
+        best_cell = None
+        best_count = None
+        for row_idx in range(self.DIM):
+            for col_idx in range(self.DIM):
+                if self.grid[row_idx, col_idx] != 0:
+                    continue
+                cand_count = len(self._candidates_for_cell(row_idx, col_idx))
+                if cand_count == 0:
+                    return (row_idx, col_idx)  # forced failure path
+                if best_count is None or cand_count < best_count:
+                    best_count = cand_count
+                    best_cell = (row_idx, col_idx)
+                    if best_count == 1:
+                        return best_cell
+        return best_cell
+
+    def _candidates_for_cell(self, row_idx: int, col_idx: int) -> Iterable[int]:
+        """
+        Compute allowed values for (row_idx, col_idx) considering:
+        - row/col/box used sets
+        - diagonal distinctness (if requested)
+        - user-supplied constraint functions
+        """
+        if self.grid[row_idx, col_idx] != 0:
+            return []
+
+        used_values = (self.row_used[row_idx]
+                       | self.col_used[col_idx]
+                       | self.box_used[self._box_index(row_idx, col_idx)])
+        all_values = set(range(1, self.DIM + 1))
+        candidate_values = all_values - used_values
+
+        # Apply diagonal distinctness via diag-used sets (fast)
+        if self.diagonal_choice in ("main", "both") and row_idx == col_idx:
+            candidate_values -= self.main_diag_used
+        if self.diagonal_choice in ("anti", "both") and row_idx + col_idx == self.DIM - 1:
+            candidate_values -= self.anti_diag_used
+
+        # Finally apply user-supplied constraint functions (e.g. anti-knight)
+        allowed = []
+        for value in candidate_values:
+            ok = True
+            for constraint_fn in self.constraints:
+                if not constraint_fn(self.grid, value, row_idx, col_idx,
+                                     self.BASE_NUMBER, self.DIM, self.mod_constraints):
+                    ok = False
+                    break
+            if ok:
+                allowed.append(value)
+        return allowed
+
+    def _place_number(self, value: int, row_idx: int, col_idx: int):
+        """Place value into grid and update all incremental structures."""
+        self.grid[row_idx, col_idx] = value
+        self.row_used[row_idx].add(value)
+        self.col_used[col_idx].add(value)
+        self.box_used[self._box_index(row_idx, col_idx)].add(value)
+        if row_idx == col_idx:
+            self.main_diag_used.add(value)
+        if row_idx + col_idx == self.DIM - 1:
+            self.anti_diag_used.add(value)
+        if self._history:
+            self._history_list.append((row_idx, col_idx, value))
+
+    def _remove_number(self, value: int, row_idx: int, col_idx: int):
+        """Undo placement (backtracking)."""
+        self.grid[row_idx, col_idx] = 0
+        self.row_used[row_idx].remove(value)
+        self.col_used[col_idx].remove(value)
+        self.box_used[self._box_index(row_idx, col_idx)].remove(value)
+        if row_idx == col_idx:
+            self.main_diag_used.discard(value)
+        if row_idx + col_idx == self.DIM - 1:
+            self.anti_diag_used.discard(value)
+        if self._history and self._history_list:
+            try:
+                self._history_list.pop()
+            except IndexError:
+                pass
+
+    def _box_index(self, row_idx: int, col_idx: int) -> int:
+        """Linear box index (0..DIM-1) for (row_idx, col_idx)."""
+        box_row = row_idx // self.BASE_NUMBER
+        box_col = col_idx // self.BASE_NUMBER
+        return box_row * self.BASE_NUMBER + box_col
+
+
+
+
+# TODO 
 def generate_validGrid(base_number = 3, 
                        seed: int = 42, 
                        history: bool = False, 
                        max_attempts: int = 10) -> np.ndarray:
-    generator = GridGenerator(base_number=base_number, history=history)
-    for _ in range(max_attempts):
-        try:
-            if seed is not None:
-                rnd_seed(seed)
-            return generator.generate()
-        except RuntimeError:
-            seed = seed * 2 + (seed // 3) 
-            continue
-    raise RuntimeError(f"Failed to generate a valid grid after {max_attempts} attempts")
-  
+        
+    gen = GridGenerator(base_number=base_number)
+    return gen.generate()
+
 
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
- # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+
+
+def generate_amazing_grid(A, B, C, seed=None):
+    """
+    Generate a 9x9 Sudoku grid following the "amazing pattern":
+    - Rows are built as permutations of three disjoint sets A, B, C
+      placed in box-triplets following the sequence:
+        perm(A), perm(B), perm(C)
+        perm(C), perm(A), perm(B)
+        perm(B), perm(C), perm(A)
+      repeated for each 3-row block.
+    - Ensures row, column, and box constraints are satisfied.
+
+    Parameters
+    ----------
+    A, B, C : iterables of 3 distinct digits each, disjoint and covering 1-9
+    seed : optional int for reproducibility
+
+    Returns
+    -------
+    grid : np.ndarray of shape (9,9) representing a valid Sudoku grid
+    """        
+    boxcol_A = _makeboxCol(A, C, B, seed=seed)
+    boxcol_B = _makeboxCol(B, A, C, seed=seed)
+    boxcol_C = _makeboxCol(C, B, A, seed=seed)
+
+    return np.hstack((boxcol_A, boxcol_B, boxcol_C))
+
+
+
+def _makeboxCol(seq1, seq2, seq3, seed=None):
+    boxcol = _makeBox(seq1, seq2, seq3, seed=seed) 
+    
+    count = 1
+    while count < 3:
+        testbox = _makeBox(seq1, seq2, seq3) 
+        
+        checker = testbox.copy()
+        diff = (boxcol.shape[0] - checker.shape[0]) // 3
+        for d in range(diff): 
+            checker = np.vstack((checker, testbox.copy())).reshape(-1,3)
+        
+        if (boxcol == checker).sum() == 0: 
+            count += 1
+            boxcol = np.vstack((boxcol, testbox)).reshape(count * 3, 3)
+    return boxcol
+
+def _makeBox(seq1, seq2, seq3, seed=None): 
+    if seed is not None:
+        random.seed(seed)
+    
+    if type(seq1[0]) == str:
+        dtype='<U1'
+    else:
+        dtype = int
+    
+    a_perms = list(permutations(list(seq1)))
+    b_perms = list(permutations(list(seq2)))
+    c_perms = list(permutations(list(seq3)))
+    
+    box = np.zeros((3,3), dtype=dtype)
+
+    a = random.choice(a_perms)
+    b = random.choice(b_perms)
+    c = random.choice(c_perms)
+    
+    box[0] = np.array(a)
+    box[1] = np.array(b)
+    box[2] = np.array(c)
+    
+    return box
+
+
+
+def _latinSquare_templates(triplet, full_perm=False):
+    perms = list(permutations(triplet))
+    combis = list(combinations(perms, len(triplet))) 
+    relevant = [c for c in combis if c[0] == tuple(triplet)]
+    valid_squares = []
+    for lat_square in relevant:
+        np_square = np.array(lat_square)
+        # Check each column has exactly the right distinct values
+        if all(len(np.unique(np_square[:, c])) == len(triplet) for c in range(np_square.shape[1])):
+            
+            for perm in permutations(np_square): 
+                if full_perm:
+                    valid_squares.append(np.array(perm))
+                    
+                elif tuple(perm[0]) == tuple(triplet):
+                    valid_squares.append(np.array(perm))
+                                   
+    return valid_squares
+
+
+
+def abc_boxcols(*ordering, abc: bool = False):
+    triplet_templates = [ 
+                            ('A','B','C'),
+                            ('D','E','F'),
+                            ('G','H','I')
+                        ] if abc else [ 
+                            (1, 2, 3),
+                            (4, 5, 6),
+                            (7, 8, 9)
+                        ]
+    
+    top_squares = _latinSquare_templates(triplet_templates[ordering[0]])
+    mid_squares = _latinSquare_templates(triplet_templates[ordering[1]],  full_perm=True)
+    bott_squares = _latinSquare_templates(triplet_templates[ordering[2]], full_perm=True)
+
+    boxcolumns = []
+    for sqA, sqB, sqC in product(top_squares, mid_squares, bott_squares):
+        # Stack the three squares as an array of shape (3,3,3)
+        stacked = np.stack([sqA, sqB, sqC], axis=1)  # shape (3,3,3)
+
+        # Reshape to interleave: row1(A,B,C), row2(A,B,C), row3(A,B,C)
+        boxcol = stacked.reshape(9, 3)
+
+        boxcolumns.append(boxcol)
+    return boxcolumns
+
+
+
+
+def amazingTriplet_grids(abc: bool = False):
+    boxcol1 = abc_boxcols(0, 1, 2, abc=abc)
+    boxcol2 = abc_boxcols(1, 2, 0, abc=abc)
+    boxcol3 = abc_boxcols(2, 0, 1, abc=abc)
+
+    grids = []
+    
+    for bcT, bcM, bcB in product(boxcol1, boxcol2, boxcol3):
+        stacked = np.stack([bcT, bcM, bcB], axis=1)  # shape (3,3, 3)
+        boxcol = stacked.reshape(9, 9)
+        
+        grids.append(boxcol)
+        
+    return np.array(grids)
+        
+
+
+def amazing_abcTriplet_grids_vec():
+    # Step 1: stack box columns for the three positions
+    bc1 = np.array(abc_boxcols(0, 1, 2))  # shape (8,9,3)
+    bc2 = np.array(abc_boxcols(1, 2, 0))
+    bc3 = np.array(abc_boxcols(2, 0, 1))
+
+    # Step 2: generate all 512 combinations (top/mid/bottom)
+    # Shape indices: (8,8,8)
+    idx = np.indices((8,8,8))
+
+    # Step 3: use advanced indexing + broadcasting to select all grids
+    top = bc1[idx[0]]  # shape (8,8,8,9,3)
+    mid = bc2[idx[1]]
+    bot = bc3[idx[2]]
+
+    # Step 4: concatenate along columns
+    grids = np.concatenate([top, mid, bot], axis=-1)  # shape (8,8,8,9,9)
+
+    # Step 5: flatten first three axes to get (512, 9, 9)
+    grids = grids.reshape(-1, 9, 9)
+
+    return grids
+
+
+
+def get_uniqueTriplets(grid: np.ndarray, basenumber=3) -> Tuple[Tuple[int]]:
+    grd = grid.copy().reshape(-1,basenumber)
+    trip_set: Set[int] = set()
+    for g in grd:
+        g = tuple(np.sort(g))
+        trip_set.add(g)
+    return tuple(trip_set)
+
+
+def get_triplets(grid: np.ndarray, basenumber=3) -> Tuple[Tuple[int]]:
+    grd = grid.copy().reshape(-1,basenumber)
+    tripList = []
+    for g in grd:
+        g = tuple(np.sort(g))
+        tripList.append(g)
+    return tuple(tripList)
+
+
+def _get_triplets_encoder(grid):
+    triplets = get_triplets(grid)
+    abc = 'abcdefghijklmnopqrstuvwxyzMTQY'
+    sortedEncoder = dict()
+    seen = []
+    idx=0
+    for triplet in triplets:
+        trpl = tuple(triplet)
+        if not trpl in seen: 
+            sortedEncoder[trpl] = abc[idx]
+            idx+=1
+            seen.append(trpl)
+    return triplets, sortedEncoder
+    
+    
+
+def make_tripGrid(grid, shape=(-1,3)):
+	triplets, encoder = _get_triplets_encoder(grid) 
+	tripletArray = []
+	for triplet in triplets:
+		tripletArray.append(encoder[triplet])
+	return np.array(tripletArray).reshape(shape)
+        
+    
+
+
+def make_tripletGraph_dict(grid):
+    tripDict = _get_triplets_encoder(grid)[1]
+    out = dict()
+    for v, k in tripDict.items():
+        out[k] = dict()
+        out[k]["values"] = v 
+        for v2, k2 in tripDict.items():
+            if k != k2: 
+                out[k][k2] = dict()
+                overlap = set(v).intersection((set(v2))) 
+                out[k][k2]["num_intersect"] = len(overlap)
+                out[k][k2]["intersection"] = overlap        
+    return out
+
+
+def get_digits_inTriplets(grid):
+    tripDict = _get_triplets_encoder(grid)[1]
+    digitDict = dict()
+    for digit in range(1,10): 
+        digitDict[digit] = set(label 
+                               for digits, label in tripDict.items()
+                               if digit in digits)
+    return digitDict
+
+
+def make_tripletAdjacencyMatrix(grid):
+    # Step 1: get unique triplets + labels
+    triplets, encoder = _get_triplets_encoder(grid)  # triplet → label
+    labels = list(encoder.values())                 # e.g. ['A','B','C',...]
+    tripSet = list(encoder.keys())                  # list of triplets
+    
+    n = len(tripSet)
+    M = np.zeros((n, n), dtype=int)
+
+    # Step 2: fill matrix with intersection sizes
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                overlap = set(tripSet[i]).intersection(set(tripSet[j]))
+                M[i, j] = len(overlap)
+            # optional: put 3 on the diagonal since every triplet has size 3
+            # M[i, i] = 3
+    
+    return M, labels, tripSet
+
+
+
+
+
+
+# triplets count:
+    
+    # out of 111230620
+    
+# Counter({25:  22883329,
+#          24:  18517142,
+#          23:  15075995,
+#          26:  13247241,
+#          20:  8647525,
+#          21:  7785875,
+#          22:  7150343,
+#          19:  6238520,
+#          27:  5054871,
+#          18:  2635381,
+#          17:  1725354,
+#          15:  939704,
+#          14:  638052,
+#          16:  346101,
+#          13:  196148,
+#          12:  67571,
+#          11:  37500,
+#          9:   29114,
+#          8:   9347,
+#          7:   4508,
+#          5:   621,
+#          3:   206,
+#          6:   172})
+
+
+
+
+
 
 
 #     Test grids for illustration and well ... testing; you're welcome ;)  
@@ -1637,381 +2301,72 @@ grd5 =  (3, 1, 7, 2, 4, 6, 5, 9, 8,
 
 
 
+# grids satisfying the anti-knight constraint
+
+kgrd1 = (6, 7, 2, 1, 5, 3, 4, 8, 9,
+         9, 8, 1, 4, 7, 2, 3, 5, 6,
+         5, 3, 4, 6, 8, 9, 1, 7, 2,
+         2, 5, 6, 8, 3, 1, 9, 4, 7,
+         7, 1, 9, 2, 4, 5, 8, 6, 3,
+         8, 4, 3, 9, 6, 7, 2, 1, 5,
+         4, 2, 5, 3, 1, 6, 7, 9, 8,
+         1, 9, 7, 5, 2, 8, 6, 3, 4,
+         3, 6, 8, 7, 9, 4, 5, 2, 1)
+        
+kgrd2 = (6, 7, 8, 5, 9, 4, 3, 1, 2,
+         4, 2, 5, 3, 1, 6, 8, 7, 9,
+         1, 9, 3, 7, 2, 8, 6, 4, 5,
+         8, 3, 6, 2, 7, 9, 4, 5, 1,
+         7, 4, 2, 6, 5, 1, 9, 8, 3,
+         5, 1, 9, 8, 4, 3, 7, 2, 6,
+         3, 5, 1, 9, 8, 7, 2, 6, 4,
+         9, 8, 4, 1, 6, 2, 5, 3, 7,
+         2, 6, 7, 4, 3, 5, 1, 9, 8)
+        
+kgrd3 = (1, 8, 9, 3, 5, 6, 2, 7, 4,
+         6, 2, 3, 7, 8, 4, 9, 5, 1, 
+         5, 4, 7, 1, 2, 9, 3, 8, 6, 
+         9, 7, 1, 5, 6, 3, 8, 4, 2,
+         3, 6, 2, 8, 4, 1, 5, 9, 7,
+         4, 5, 8, 9, 7, 2, 1, 6, 3, 
+         2, 1, 5, 6, 9, 7, 4, 3, 8, 
+         8, 3, 6, 4, 1, 5, 7, 2, 9, 
+         7, 9, 4, 2, 3, 8, 6, 1, 5)
+        
+kgrd4 = (6, 1, 2, 3, 8, 9, 4, 5, 7,
+         7, 8, 3, 5, 1, 4, 6, 2, 9,
+         9, 4, 5, 7, 2, 6, 8, 1, 3,
+         1, 6, 7, 2, 3, 5, 9, 8, 4,
+         5, 3, 8, 9, 4, 1, 2, 7, 6,
+         4, 2, 9, 6, 7, 8, 1, 3, 5,
+         2, 9, 6, 1, 5, 7, 3, 4, 8,
+         8, 5, 1, 4, 9, 3, 7, 6, 2,
+         3, 7, 4, 8, 6, 2, 5, 9, 1)
+        
+    
+    
+
+# -> gen.generate(seed=7) 
+amazing_mod_grd = np.array([
+                            [2, 5, 4, 3, 6, 1, 8, 7, 9],
+                            [9, 8, 7, 4, 5, 2, 3, 6, 1],
+                            [1, 3, 6, 9, 8, 7, 2, 4, 5],
+                            [5, 4, 2, 1, 3, 6, 9, 8, 7],
+                            [7, 9, 8, 2, 4, 5, 1, 3, 6],
+                            [6, 1, 3, 7, 9, 8, 5, 2, 4],
+                            [4, 2, 5, 6, 1, 3, 7, 9, 8],
+                            [8, 7, 9, 5, 2, 4, 6, 1, 3],
+                            [3, 6, 1, 8, 7, 9, 4, 5, 2]
+                            ])
 
 
 
 
-
-
-
-
-
-# some grids satifying the anti-knight's move constraint
-
-proto_knight_grids = [
-    
-    (6, 7, 2, 1, 5, 3, 4, 8, 9,
-     9, 8, 1, 4, 7, 2, 3, 5, 6,
-     5, 3, 4, 6, 8, 9, 1, 7, 2,
-     2, 5, 6, 8, 3, 1, 9, 4, 7,
-     7, 1, 9, 2, 4, 5, 8, 6, 3,
-     8, 4, 3, 9, 6, 7, 2, 1, 5,
-     4, 2, 5, 3, 1, 6, 7, 9, 8,
-     1, 9, 7, 5, 2, 8, 6, 3, 4,
-     3, 6, 8, 7, 9, 4, 5, 2, 1),
-    
-    (6, 7, 8, 5, 9, 4, 3, 1, 2,
-     4, 2, 5, 3, 1, 6, 8, 7, 9,
-     1, 9, 3, 7, 2, 8, 6, 4, 5,
-     8, 3, 6, 2, 7, 9, 4, 5, 1,
-     7, 4, 2, 6, 5, 1, 9, 8, 3,
-     5, 1, 9, 8, 4, 3, 7, 2, 6,
-     3, 5, 1, 9, 8, 7, 2, 6, 4,
-     9, 8, 4, 1, 6, 2, 5, 3, 7,
-     2, 6, 7, 4, 3, 5, 1, 9, 8), 
-    
-    (1, 8, 9, 3, 5, 6, 2, 7, 4,
-     6, 2, 3, 7, 8, 4, 9, 5, 1, 
-     5, 4, 7, 1, 2, 9, 3, 8, 6, 
-     9, 7, 1, 5, 6, 3, 8, 4, 2,
-     3, 6, 2, 8, 4, 1, 5, 9, 7,
-     4, 5, 8, 9, 7, 2, 1, 6, 3, 
-     2, 1, 5, 6, 9, 7, 4, 3, 8, 
-     8, 3, 6, 4, 1, 5, 7, 2, 9, 
-     7, 9, 4, 2, 3, 8, 6, 1, 5),
-    
-    (6, 1, 2, 3, 8, 9, 4, 5, 7,
-     7, 8, 3, 5, 1, 4, 6, 2, 9,
-     9, 4, 5, 7, 2, 6, 8, 1, 3,
-     1, 6, 7, 2, 3, 5, 9, 8, 4,
-     5, 3, 8, 9, 4, 1, 2, 7, 6,
-     4, 2, 9, 6, 7, 8, 1, 3, 5,
-     2, 9, 6, 1, 5, 7, 3, 4, 8,
-     8, 5, 1, 4, 9, 3, 7, 6, 2,
-     3, 7, 4, 8, 6, 2, 5, 9, 1), 
-    
-    (6,8,9,5,7,2,4,1,3,
-     3,7,1,4,6,9,5,8,2,
-     2,5,4,8,3,1,7,6,9,
-     8,2,6,9,5,7,1,3,4,
-     9,1,3,6,2,4,8,5,7,
-     5,4,7,3,1,8,9,2,6,
-     4,6,2,7,8,5,3,9,1,
-     1,9,5,2,4,3,6,7,8,
-     7,3,8,1,9,6,2,4,5),
-
-    (2,3,5,1,6,4,7,8,9,
-     4,6,9,8,2,7,3,1,5,
-     7,1,8,9,5,3,6,2,4,
-     1,5,3,4,9,6,8,7,2,
-     6,9,4,2,7,8,1,5,3,
-     8,7,2,5,3,1,9,4,6,
-     5,2,7,3,1,9,4,6,8,
-     9,4,6,7,8,2,5,3,1,
-     3,8,1,6,4,5,2,9,7),
-    
-    (1,8,5,4,2,9,7,3,6,
-     7,2,6,3,8,1,9,5,4,
-     4,9,3,7,5,6,1,2,8,
-     6,1,9,2,4,5,3,8,7,
-     2,7,8,6,1,3,5,4,9,
-     3,5,4,8,9,7,2,6,1,
-     8,3,2,9,7,4,6,1,5,
-     9,6,1,5,3,8,4,7,2,
-     5,4,7,1,6,2,8,9,3), 
-    
-    (4,9,6,1,7,5,3,2,8,
-     8,5,2,4,9,3,6,7,1,
-     3,1,7,2,8,6,4,9,5,
-     9,6,1,8,5,7,2,4,3,
-     5,2,8,3,4,9,1,6,7,
-     7,4,3,6,2,1,8,5,9,
-     6,3,9,7,1,2,5,8,4,
-     2,8,5,9,3,4,7,1,6,
-     1,7,4,5,6,8,9,3,2),
-    
-    (9,1,7,4,3,2,5,6,8,
-     8,6,2,7,9,5,1,3,4,
-     5,4,3,8,6,1,7,9,2,
-     7,3,9,5,1,4,8,2,6,
-     1,2,6,9,7,8,4,5,3,
-     4,5,8,3,2,6,9,7,1,
-     3,8,5,2,4,9,6,1,7,
-     2,9,1,6,8,7,3,4,5,
-     6,7,4,1,5,3,2,8,9),
-    
-    (4,6,5,9,3,2,1,7,8,
-     1,3,9,8,7,6,2,5,4,
-     2,7,8,1,5,4,6,9,3,
-     9,5,4,6,1,8,7,3,2,
-     8,1,3,7,2,9,5,4,6,
-     6,2,7,3,4,5,9,8,1,
-     3,9,2,4,6,7,8,1,5,
-     5,8,1,2,9,3,4,6,7,
-     7,4,6,5,8,1,3,2,9), 
-    
-    (2,5,9,8,7,6,1,3,4,
-     7,6,4,3,5,1,2,9,8,
-     8,1,3,4,9,2,7,5,6,
-     5,9,1,6,2,7,8,4,3,
-     4,7,6,5,3,8,9,1,2,
-     3,2,8,9,1,4,6,7,5,
-     9,8,2,1,4,5,3,6,7,
-     1,4,7,2,6,3,5,8,9,
-     6,3,5,7,8,9,4,2,1), 
-    
-    (5,8,9,2,1,3,7,6,4,
-     7,1,4,5,6,9,8,2,3,
-     2,6,3,4,7,8,5,1,9,
-     9,3,8,1,2,7,4,5,6,
-     1,7,5,6,3,4,9,8,2,
-     4,2,6,9,8,5,1,3,7,
-     3,4,1,8,9,2,6,7,5,
-     8,5,7,3,4,6,2,9,1,
-     6,9,2,7,5,1,3,4,8), 
-    
-    (9,8,6,7,2,5,1,3,4,
-     2,3,1,4,9,8,5,7,6,
-     7,5,4,1,6,3,2,9,8,
-     5,4,8,2,7,6,3,1,9,
-     3,1,2,8,4,9,6,5,7,
-     6,9,7,3,5,1,8,4,2,
-     8,6,9,5,3,7,4,2,1,
-     1,2,5,9,8,4,7,6,3,
-     4,7,3,6,1,2,9,8,5),
-    
-    (4,5,3,7,8,9,2,1,6,
-     6,8,7,2,1,5,9,3,4,
-     2,1,9,4,3,6,8,7,5,
-     5,3,4,9,7,2,6,8,1,
-     9,7,8,6,5,1,3,4,2,
-     1,2,6,8,4,3,7,5,9,
-     3,4,2,1,9,7,5,6,8,
-     7,9,1,5,6,8,4,2,3,
-     8,6,5,3,2,4,1,9,7),
-
-    (8,1,3,2,9,4,7,6,5,
-     6,4,7,3,5,1,8,2,9,
-     2,5,9,7,6,8,1,3,4,
-     3,2,1,9,7,6,5,4,8,
-     7,6,8,5,4,3,2,9,1,
-     4,9,5,8,1,2,3,7,6,
-     1,3,2,6,8,9,4,5,7,
-     5,8,6,4,3,7,9,1,2,
-     9,7,4,1,2,5,6,8,3), 
-    
-    (3,2,1,6,4,7,5,8,9,
-     7,4,5,1,8,9,6,3,2,
-     8,6,9,5,3,2,1,7,4,
-     6,1,2,4,7,3,8,9,5,
-     9,7,4,8,6,5,3,2,1,
-     5,3,8,9,2,1,4,6,7,
-     2,5,3,7,1,8,9,4,6,
-     4,9,7,3,5,6,2,1,8,
-     1,8,6,2,9,4,7,5,3),
-    
-    (9,1,4,8,7,3,6,2,5,
-     5,7,6,4,2,9,8,1,3,
-     8,2,3,6,1,5,9,4,7,
-     6,3,5,9,8,1,2,7,4,
-     7,4,9,5,3,2,1,8,6,
-     2,8,1,7,4,6,5,3,9,
-     3,5,8,1,6,4,7,9,2,
-     1,9,2,3,5,7,4,6,8,
-     4,6,7,2,9,8,3,5,1),
-    
-    (4,1,8,5,2,9,7,6,3,
-     3,7,5,6,1,4,8,2,9,
-     6,9,2,3,7,8,4,5,1,
-     5,4,1,2,3,6,9,7,8,
-     7,8,6,9,4,5,1,3,2,
-     2,3,9,7,8,1,5,4,6,
-     1,5,7,8,6,3,2,9,4,
-     9,6,4,1,5,2,3,8,7,
-     8,2,3,4,9,7,6,1,5),
-    
-    (3,8,6,2,4,5,7,1,9,
-     5,1,7,6,8,9,3,2,4,
-     4,2,9,7,1,3,6,8,5,
-     7,4,3,5,2,6,8,9,1,
-     8,6,1,3,9,4,5,7,2,
-     9,5,2,8,7,1,4,6,3,
-     1,9,8,4,5,7,2,3,6,
-     6,7,4,1,3,2,9,5,8,
-     2,3,5,9,6,8,1,4,7), 
-    
-    (5,1,6,2,9,8,7,3,4,
-     9,4,7,3,1,6,8,2,5,
-     8,2,3,7,5,4,6,1,9,
-     7,6,2,8,4,5,3,9,1,
-     4,5,1,9,6,3,2,7,8,
-     3,8,9,1,7,2,4,5,6,
-     1,9,8,4,2,7,5,6,3,
-     6,7,4,5,3,9,1,8,2,
-     2,3,5,6,8,1,9,4,7),
-    
-    (5,7,9,3,1,4,8,2,6,
-     8,6,4,9,2,5,3,7,1,
-     3,2,1,7,8,6,5,9,4,
-     4,3,2,8,7,1,6,5,9,
-     9,5,6,4,3,2,1,8,7,
-     1,8,7,6,5,9,4,3,2,
-     2,1,8,5,6,7,9,4,3,
-     6,9,5,2,4,3,7,1,8,
-     7,4,3,1,9,8,2,6,5),
-    
-    (6,1,5,4,9,8,3,7,2,
-     2,8,3,6,7,5,1,9,4,
-     4,7,9,3,2,1,5,6,8,
-     7,6,1,2,8,9,4,5,3,
-     8,3,2,5,6,4,7,1,9,
-     5,9,4,7,1,3,2,8,6,
-     9,5,6,1,3,2,8,4,7,
-     1,2,8,9,4,7,6,3,5,
-     3,4,7,8,5,6,9,2,1),
-    
-    (6,1,7,9,8,5,2,3,4,
-     8,4,3,2,6,1,5,9,7,
-     5,9,2,3,4,7,8,6,1,
-     9,5,1,8,7,4,3,2,6,
-     4,3,8,1,2,6,9,7,5,
-     2,7,6,5,3,9,1,4,8,
-     7,2,9,6,5,8,4,1,3,
-     3,8,4,7,1,2,6,5,9,
-     1,6,5,4,9,3,7,8,2),
-    
-    (3,2,8,7,4,9,1,5,6,
-     5,4,6,8,3,1,2,7,9,
-     1,7,9,6,5,2,4,3,8,
-     7,9,3,5,2,4,6,8,1,
-     6,8,4,1,7,3,9,2,5,
-     2,5,1,9,6,8,3,4,7,
-     9,3,7,2,8,6,5,1,4,
-     8,6,2,4,1,5,7,9,3,
-     4,1,5,3,9,7,8,6,2),
-    
-    (4,5,1,9,3,2,7,6,8,
-     3,8,2,4,6,7,1,5,9,
-     9,6,7,5,8,1,4,3,2,
-     6,7,3,8,5,4,9,2,1,
-     1,2,4,3,7,9,6,8,5,
-     8,9,5,1,2,6,3,7,4,
-     7,3,9,2,1,8,5,4,6,
-     2,1,6,7,4,5,8,9,3,
-     5,4,8,6,9,3,2,1,7),
-    
-    (7,3,9,1,2,8,4,6,5,
-     8,5,1,7,6,4,3,9,2,
-     4,6,2,3,9,5,1,7,8,
-     9,2,3,8,5,1,6,4,7,
-     5,7,8,6,4,3,9,2,1,
-     1,4,6,2,7,9,5,8,3,
-     2,9,4,5,1,7,8,3,6,
-     6,8,5,4,3,2,7,1,9,
-     3,1,7,9,8,6,2,5,4),
-    
-    (6,1,8,2,4,7,5,3,9,
-     5,7,9,8,3,6,1,2,4,
-     2,3,4,1,5,9,6,7,8,
-     9,2,1,6,7,5,4,8,3,
-     7,5,6,3,8,4,2,9,1,
-     8,4,3,9,1,2,7,5,6,
-     4,8,2,7,9,1,3,6,5,
-     1,9,7,5,6,3,8,4,2,
-     3,6,5,4,2,8,9,1,7), 
-    
-    (2,1,8,6,9,3,7,4,5,
-     9,4,5,8,1,7,3,2,6,
-     3,6,7,2,4,5,8,9,1,
-     8,3,6,7,2,4,5,1,9,
-     4,2,1,5,8,9,6,3,7,
-     5,7,9,1,3,6,2,8,4,
-     7,9,4,3,6,2,1,5,8,
-     6,8,3,4,5,1,9,7,2,
-     1,5,2,9,7,8,4,6,3),
-    
-    (6,4,3,7,2,5,8,1,9,
-     7,9,5,3,1,8,4,2,6,
-     1,2,8,6,9,4,3,5,7,
-     3,1,6,9,7,2,5,8,4,
-     5,7,9,4,8,1,2,6,3,
-     2,8,4,5,6,3,9,7,1,
-     8,6,1,2,3,9,7,4,5,
-     9,5,2,1,4,7,6,3,8,
-     4,3,7,8,5,6,1,9,2),
-    
-    (6,5,2,4,3,9,8,1,7,
-     7,9,4,1,6,8,5,2,3,
-     3,8,1,5,2,7,4,9,6,
-     4,3,6,9,7,2,1,8,5,
-     1,7,9,6,8,5,2,3,4,
-     8,2,5,3,1,4,7,6,9,
-     2,4,3,7,9,1,6,5,8,
-     9,1,7,8,5,6,3,4,2,
-     5,6,8,2,4,3,9,7,1),
-    
-    (1,5,8,2,4,7,6,9,3,
-     3,4,9,6,1,5,7,8,2,
-     6,2,7,9,8,3,4,1,5,
-     2,1,5,8,3,4,9,6,7,
-     7,9,4,5,6,1,2,3,8,
-     8,6,3,7,9,2,5,4,1,
-     5,3,6,1,2,9,8,7,4,
-     9,7,1,4,5,8,3,2,6,
-     4,8,2,3,7,6,1,5,9),
-    
-    (4,7,5,1,6,3,2,8,9,
-     8,9,2,4,7,5,1,6,3,
-     1,6,3,2,8,9,4,7,5,
-     5,4,6,3,1,8,9,2,7,
-     7,2,9,5,4,6,3,1,8,
-     3,1,8,9,2,7,5,4,6,
-     6,3,1,8,9,2,7,5,4,
-     2,5,7,6,3,4,8,9,1,
-     9,8,4,7,5,1,6,3,2),
-    
-    (1,8,7,9,6,2,3,4,5,
-     3,6,9,5,4,8,7,1,2,
-     2,4,5,3,1,7,6,9,8,
-     8,5,4,1,7,6,2,3,9,
-     9,3,2,4,8,5,1,7,6,
-     7,1,6,2,3,9,5,8,4,
-     4,7,8,6,2,3,9,5,1,
-     6,9,3,8,5,1,4,2,7,
-     5,2,1,7,9,4,8,6,3),
-    
-    (8,5,9,7,2,4,1,3,6,
-     1,3,6,8,5,9,7,2,4,
-     4,7,2,1,3,6,8,5,9,
-     7,4,1,2,6,8,5,9,3,
-     3,6,8,5,9,1,4,7,2,
-     2,9,5,4,7,3,6,8,1,
-     9,2,4,6,8,7,3,1,5,
-     6,8,3,9,1,5,2,4,7,
-     5,1,7,3,4,2,9,6,8),
-    
-    (1,7,6,8,5,3,9,4,2,
-     9,5,2,4,1,7,3,6,8,
-     3,8,4,9,6,2,5,1,7,
-     6,1,8,7,3,5,2,9,4,
-     5,9,7,2,4,1,6,8,3,
-     2,4,3,6,8,9,1,7,5,
-     4,2,1,3,9,8,7,5,6,
-     7,6,5,1,2,4,8,3,9,
-     8,3,9,5,7,6,4,2,1),
-    
-    (2,9,6,7,8,3,4,1,5,
-     5,3,4,2,1,6,7,9,8,
-     1,7,8,4,9,5,2,3,6,
-     7,6,5,8,4,9,3,2,1,
-     4,2,3,5,6,1,9,8,7,
-     9,8,1,3,2,7,5,6,4,
-     8,5,7,1,3,2,6,4,9,
-     6,4,2,9,5,8,1,7,3,
-     3,1,9,6,7,4,8,5,2)
-    
-    ]
-
+prt = np.zeros((9,9), dtype=int)
+rnd = np.random.choice(np.arange(1,10), 9, replace=False)
+for i in range(9):
+    prt[i, 8] = rnd[i]
+    prt[i, 0] = rnd[(i - 1) % 9]
 
 
 
@@ -2054,22 +2409,6 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ##########################################
 
 
@@ -2078,21 +2417,6 @@ if __name__ == '__main__':
 
 # faculty(81) / (faculty(9)**9) = 
     # 53130688706387570345024083447116905297676780137518287775972350551392256        (len 71)
-
-
-
-# g = Grid()
-# abc_k = []
-
-# for gr in proto_knight_grids:
-#     g.insert(gr)
-#     for i in range(2):
-#         g.diaflect()
-#         for j in range(4):
-#             g.rotate()
-#             print(f"valid: {g.is_valid()}  ==  knight: {g.is_chivalrous()}")
-#             abc_k.append(g.canonical_abc_key())
-#     print()
 
 
 
