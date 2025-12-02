@@ -10,7 +10,7 @@ $\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
 
 
 **Central components**: 
-- **Grid** (class):
+- **Grid** (class) -- for documentation, see Grid_class_manual.pdf:
   	* instantiate, generate, manipulate and permute (individual) Sudoku grids;
   	* constraints on grid generation (anti-knight, modular knight, diagonals);
   	* triplets;
