@@ -10,11 +10,12 @@ $\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
 
 
 **Central components**: 
-- **Grid** (class) -- for documentation, see Grid_class_manual.pdf:
+- **Grid** (class):
   	* instantiate, generate, manipulate and permute (individual) Sudoku grids;
   	* constraints on grid generation (anti-knight, modular knight, diagonals);
   	* triplets;
-  	* generate grid permutation series to be instantiated as GridCollection. 
+  	* generate grid permutation series to be instantiated as GridCollection.
+  	* ==> for documentation, see Grid_class_manual.pdf
 - **GridCollection** (class):
     * static constructor methods: from_scratch, from_sql 
     * transform grid collections in various ways
