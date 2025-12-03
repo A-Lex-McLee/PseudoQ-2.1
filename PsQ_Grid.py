@@ -660,7 +660,12 @@ class Grid:
             list of 
          
         """        
-        grid, _ = self.Generator.generate(seed=seed, max_attempts = max_attempts)
+        # temporary fix -- TODO!!
+        if self.BASE_NUMBER != 3: 
+            grid, _ = generate_validGrid(base_number=self.BASE_NUMBER, 
+                                         seed=seed, max_attempts=max_attempts)
+        else:
+            grid, _ = self.Generator.generate(seed=seed, max_attempts = max_attempts)
         self.insert(grid) 
         
     
@@ -670,9 +675,9 @@ class Grid:
         try:
             int_grid = np.array(grid, 
                                 dtype=int
-                                ).reshape(self.BASE_NUMBER, self.BASE_NUMBER) 
+                                ).reshape(self.DIMENSION, self.DIMENSION) 
         except ValueError:
-            msg = (f"Required shape: {(self.BASE_NUMBER, self.BASE_NUMBER)}; type: int;"
+            msg = (f"Required shape: {(self.DIMENSION, self.DIMENSION)}; type: int;  "
                    f"Got {grid.shape}; {grid.dtype}")
             raise ValueError(msg)
         
@@ -1273,7 +1278,7 @@ class Grid:
         if toCollection:
             return GridCollection(out_grids)
         else:
-            return out_grids
+            return out_grids 
 
 
 
@@ -1337,7 +1342,8 @@ class Grid:
 
     def _substituteValues(self, 
                          recoder: List[V],
-                         insert: bool = True
+                         insert: bool = True,
+                         to_alpha: bool = False
                          ) -> Optional[np.ndarray]:        
         """
         Internal aux method to perform value substitution across the grid via top-row mapping.
@@ -1375,7 +1381,7 @@ class Grid:
         newGrid = vectorized_map(grid)
 
         if insert:
-            self.insert(newGrid)
+            self.insert(newGrid, automatic_check=to_alpha)
         else:
             return newGrid
 
@@ -1443,7 +1449,7 @@ class Grid:
         if is_str and not to_alpha:
             raise ValueError("(General) Alphabetic recoding requires to_alpha=True")
         
-        self._substituteValues(recoder=recoder, insert=insert)
+        self._substituteValues(recoder=recoder, insert=insert, to_alpha=to_alpha)
 
 
 

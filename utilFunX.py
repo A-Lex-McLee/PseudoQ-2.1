@@ -105,8 +105,9 @@ def _is_validgrid(gridlike: SequenceLike,
     dimension = basenumber**2
     
     if gridlike.dtype == np.dtype('U1'):
-        expected = set(chr(i) 
-                       for i in range(65, 65 + dimension))
+        expected = set(gridlike) 
+        # expected = set(chr(i) 
+        #                for i in range(65, 65 + dimension))
     elif np.issubdtype(gridlike.dtype, np.integer):
         expected = set(range(1, dimension + 1))
     else:
@@ -259,6 +260,16 @@ def _split_dataset(
     )
 
 
+
+
+def _all_grid_coords(size=9):
+    idx = np.arange(size)  # [0, 1, ..., 8]
+    rows, cols = np.meshgrid(idx, idx, indexing='ij')
+    # rows and cols are 9x9 arrays of row and col indices
+    
+    # flatten both arrays and zip into (row, col) tuples
+    coords = list(zip(rows.flatten(), cols.flatten()))
+    return coords
 
 
 
