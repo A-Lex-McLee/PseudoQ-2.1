@@ -34,7 +34,7 @@ $\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
 <pre> ```
 # illustration: create a dataset for multiclass classification task  
 	
-import GridCollection as GC
+from PsQ_GridCollection import GridCollection as GC
 gc = GC.from_scratch()
 gc.makeFalseGrids_arbitrary() 
 gc.makeFalseGrids_cardinality()
