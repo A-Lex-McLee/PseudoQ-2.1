@@ -79,7 +79,7 @@ GridCollection[
 - tkinter: 'PsQ_GUI' - obsolete/deprecated (just in case you have not installed PyQt)
 - PyQt: 'PsQ_Display: Grid permutations, recodings, rnd grid generation; AI Sudoku solver; integrated Python editor (preliminary version)
  
-Currently, the main purpose of the GUI is to illustrate the basic functionalities of Grid and GridCollection; further functionalities will be added.
+Currently, the main purpose of the GUI is to illustrate the basic functionalities of Grid and GridCollection, as well as a Sudoku-solver demo; further functionalities will be added.
 
 
 **Auxiliary classes/functions**: prerequisites for notebooks
