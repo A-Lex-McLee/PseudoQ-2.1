@@ -29,6 +29,7 @@ $\Rightarrow$ **Create millions of labeled data in a couple of minutes!**
         - multiclass classification
         - blanked grids/puzzles to train solvers 
     * SQL API to load / store datasets <br>
+  	* ==> for documentation, see GridCollection_class_manual.pdf
 
 
 <pre> ```
